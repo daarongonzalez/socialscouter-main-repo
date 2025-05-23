@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Base colors */
+  --background: 0 0% 100%; /* #FFFFFF */
+  --foreground: 207 9% 10%; /* #191919 */
+  
+  /* Muted colors */
+  --muted: 210 11% 95%; /* #F2F2F2 */
+  --muted-foreground: 213 6% 50%; /* #7F7F7F */
+  
+  /* Card colors */
+  --card: 0 0% 100%; /* #FFFFFF */
+  --card-foreground: 207 9% 10%; /* #191919 */
+  
+  /* Popover colors */
+  --popover: 0 0% 100%; /* #FFFFFF */
+  --popover-foreground: 207 9% 10%; /* #191919 */
+  
+  /* Primary colors - Blue Ribbon */
+  --primary: 232 90% 55%; /* #2339F6 */
+  --primary-foreground: 221 100% 99%; /* #FFFFFF */
+  
+  /* Secondary colors */
+  --secondary: 210 11% 95%; /* #F2F2F2 */
+  --secondary-foreground: 207 9% 10%; /* #191919 */
+  
+  /* Accent colors - Blue Ribbon Light */
+  --accent: 236 92% 69%; /* #6574F8 */
+  --accent-foreground: 221 100% 99%; /* #FFFFFF */
+  
+  /* Destructive colors */
+  --destructive: 0 84% 60%; /* #EF4444 */
+  --destructive-foreground: 210 40% 98%; /* #FEFEFE */
+  
+  /* Border and input */
+  --border: 214 15% 85%; /* #D8D8D8 */
+  --input: 214 15% 85%; /* #D8D8D8 */
+  --ring: 232 90% 55%; /* #2339F6 */
+  
+  /* Custom color variables for our design system */
+  --blue-ribbon-50: 232 96% 97%; /* #E9EBFE */
+  --blue-ribbon-100: 234 95% 91%; /* #D3D7FD */
+  --blue-ribbon-300: 236 92% 69%; /* #6574F8 */
+  --blue-ribbon-500: 232 90% 55%; /* #2339F6 */
+  --blue-ribbon-600: 232 75% 44%; /* #1C2DC4 */
+  --blue-ribbon-700: 232 82% 22%; /* #0E1662 */
+  --blue-ribbon-800: 232 72% 16%; /* #0A1149 */
+  
+  --tree-poppy-50: 35 100% 97%; /* #FFF4E8 */
+  --tree-poppy-100: 35 100% 91%; /* #FFE9D1 */
+  --tree-poppy-300: 35 100% 69%; /* #FFB260 */
+  --tree-poppy-500: 26 100% 55%; /* #FF921D */
+  --tree-poppy-600: 26 79% 44%; /* #CC7417 */
+  --tree-poppy-700: 26 85% 22%; /* #663A0B */
+  --tree-poppy-800: 26 75% 16%; /* #4C2B08 */
+  
+  --neutral-50: 0 0% 100%; /* #FFFFFF */
+  --neutral-100: 0 0% 95%; /* #F2F2F2 */
+  --neutral-200: 0 0% 85%; /* #D8D8D8 */
+  --neutral-300: 0 0% 70%; /* #B2B2B2 */
+  --neutral-500: 0 0% 50%; /* #7F7F7F */
+  --neutral-600: 0 0% 30%; /* #4C4C4C */
+  --neutral-800: 207 9% 10%; /* #191919 */
+  --neutral-900: 0 0% 0%; /* #000000 */
+  
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 207 9% 10%; /* #191919 */
+  --foreground: 0 0% 100%; /* #FFFFFF */
+  --muted: 0 0% 15%; /* #262626 */
+  --muted-foreground: 0 0% 70%; /* #B2B2B2 */
+  --card: 207 9% 10%; /* #191919 */
+  --card-foreground: 0 0% 100%; /* #FFFFFF */
+  --popover: 207 9% 10%; /* #191919 */
+  --popover-foreground: 0 0% 100%; /* #FFFFFF */
+  --primary: 232 90% 55%; /* #2339F6 */
+  --primary-foreground: 221 100% 99%; /* #FFFFFF */
+  --secondary: 0 0% 15%; /* #262626 */
+  --secondary-foreground: 0 0% 100%; /* #FFFFFF */
+  --accent: 236 92% 69%; /* #6574F8 */
+  --accent-foreground: 221 100% 99%; /* #FFFFFF */
+  --destructive: 0 84% 60%; /* #EF4444 */
+  --destructive-foreground: 210 40% 98%; /* #FEFEFE */
+  --border: 0 0% 30%; /* #4C4C4C */
+  --input: 0 0% 30%; /* #4C4C4C */
+  --ring: 232 90% 55%; /* #2339F6 */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer utilities {
+  .text-blue-ribbon {
+    color: hsl(var(--blue-ribbon-500));
+  }
+  
+  .bg-blue-ribbon {
+    background-color: hsl(var(--blue-ribbon-500));
+  }
+  
+  .border-blue-ribbon {
+    border-color: hsl(var(--blue-ribbon-500));
+  }
+  
+  .text-tree-poppy {
+    color: hsl(var(--tree-poppy-500));
+  }
+  
+  .bg-tree-poppy {
+    background-color: hsl(var(--tree-poppy-500));
+  }
+  
+  .border-tree-poppy {
+    border-color: hsl(var(--tree-poppy-500));
+  }
+}
