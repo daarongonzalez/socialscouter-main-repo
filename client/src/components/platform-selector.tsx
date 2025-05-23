@@ -3,7 +3,7 @@
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 
-const platforms = [
+const platforms: Array<{ value: 'tiktok' | 'reels' | 'shorts'; label: string; icon: string }> = [
   { value: "tiktok", label: "TikTok", icon: "🎵" },
   { value: "reels", label: "Instagram Reels", icon: "📸" },
   { value: "shorts", label: "YouTube Shorts", icon: "📺" },
