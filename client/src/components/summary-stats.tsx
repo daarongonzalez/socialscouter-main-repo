@@ -21,12 +21,12 @@ export function SummaryStats({ analysisResults }: SummaryStatsProps) {
   }
 
   const { summary } = analysisResults
-  const { sentimentCounts, avgConfidence, totalVideos, totalWords } = summary
+  const { sentimentCounts, sentimentScores, avgConfidence, totalVideos, totalWords } = summary
 
-  const total = sentimentCounts.POSITIVE + sentimentCounts.NEUTRAL + sentimentCounts.NEGATIVE
-  const positivePercentage = total > 0 ? Math.round((sentimentCounts.POSITIVE / total) * 100) : 0
-  const neutralPercentage = total > 0 ? Math.round((sentimentCounts.NEUTRAL / total) * 100) : 0
-  const negativePercentage = total > 0 ? Math.round((sentimentCounts.NEGATIVE / total) * 100) : 0
+  // Use the new sentiment score averages if available, fallback to counts
+  const positivePercentage = sentimentScores?.positive ?? 0
+  const neutralPercentage = sentimentScores?.neutral ?? 0
+  const negativePercentage = sentimentScores?.negative ?? 0
 
   return (
     <Card className="bg-neutral-100 border-neutral-200">
