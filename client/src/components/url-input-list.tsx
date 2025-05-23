@@ -17,9 +17,10 @@ import {
 interface UrlInputListProps {
   urls: string[];
   onUrlsChange: (urls: string[]) => void;
+  contentType: 'tiktok' | 'reels' | 'shorts';
 }
 
-export function UrlInputList({ urls, onUrlsChange }: UrlInputListProps) {
+export function UrlInputList({ urls, onUrlsChange, contentType }: UrlInputListProps) {
   const handleUrlChange = (index: number, value: string) => {
     const newUrls = [...urls]
     newUrls[index] = value
@@ -45,6 +46,19 @@ export function UrlInputList({ urls, onUrlsChange }: UrlInputListProps) {
     return /^https?:\/\//.test(url.trim()) ? 'valid' : 'invalid';
   }
 
+  const getPlaceholder = () => {
+    switch (contentType) {
+      case 'tiktok':
+        return 'https://www.tiktok.com/@username/video/...'
+      case 'reels':
+        return 'https://www.instagram.com/reel/...'
+      case 'shorts':
+        return 'https://www.youtube.com/shorts/...'
+      default:
+        return 'url: https://bestreelev...'
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Label className="text-sm font-medium text-neutral-800">Clips to Analyze:</Label>
@@ -59,7 +73,7 @@ export function UrlInputList({ urls, onUrlsChange }: UrlInputListProps) {
                     type="url"
                     value={url}
                     onChange={(e) => handleUrlChange(index, e.target.value)}
-                    placeholder="url: https://bestreelev..."
+                    placeholder={getPlaceholder()}
                     className="w-full bg-neutral-100 border-neutral-200 text-sm pr-10"
                   />
                   <div className="absolute inset-y-0 right-0 flex items-center pr-3">
