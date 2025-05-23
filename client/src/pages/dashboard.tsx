@@ -68,6 +68,7 @@ export default function Dashboard() {
             <UrlInputList
               urls={urls}
               onUrlsChange={setUrls}
+              contentType={contentType}
             />
             <div className="space-y-4">
               <Button
