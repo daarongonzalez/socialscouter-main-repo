@@ -1,12 +1,12 @@
 "use client"
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 
 const platforms = [
-  { value: "shorts", label: "Youtube Shorts" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "reels", label: "Instagram Reels" },
+  { value: "tiktok", label: "TikTok", icon: "🎵" },
+  { value: "reels", label: "Instagram Reels", icon: "📸" },
+  { value: "shorts", label: "YouTube Shorts", icon: "📺" },
 ]
 
 interface PlatformSelectorProps {
@@ -16,22 +16,27 @@ interface PlatformSelectorProps {
 
 export function PlatformSelector({ contentType, onContentTypeChange }: PlatformSelectorProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor="platform-select" className="text-sm font-medium text-neutral-800">
-        Choose a platform:
+    <div className="space-y-3">
+      <Label className="text-sm font-medium text-neutral-800">
+        Content Type
       </Label>
-      <Select value={contentType} onValueChange={onContentTypeChange}>
-        <SelectTrigger id="platform-select" className="w-full bg-neutral-100 border-neutral-200">
-          <SelectValue placeholder="Select platform" />
-        </SelectTrigger>
-        <SelectContent>
-          {platforms.map((platform) => (
-            <SelectItem key={platform.value} value={platform.value}>
-              {platform.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="space-y-2">
+        {platforms.map((platform) => (
+          <Button
+            key={platform.value}
+            variant={contentType === platform.value ? "default" : "outline"}
+            onClick={() => onContentTypeChange(platform.value)}
+            className={`w-full justify-start h-12 ${
+              contentType === platform.value
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+            }`}
+          >
+            <span className="text-lg mr-3">{platform.icon}</span>
+            {platform.label}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Plus, X } from "lucide-react"
+import { Plus, X, CheckCircle, XCircle, Link } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -40,33 +40,59 @@ export function UrlInputList({ urls, onUrlsChange }: UrlInputListProps) {
     }
   }
 
+  const validateUrl = (url: string): 'valid' | 'invalid' | 'empty' => {
+    if (!url.trim()) return 'empty';
+    return /^https?:\/\//.test(url.trim()) ? 'valid' : 'invalid';
+  }
+
   return (
     <div className="space-y-4">
       <Label className="text-sm font-medium text-neutral-800">Clips to Analyze:</Label>
-      <div className="space-y-2">
-        {urls.map((url, index) => (
-          <div key={index} className="flex gap-2">
-            <Input
-              type="url"
-              value={url}
-              onChange={(e) => handleUrlChange(index, e.target.value)}
-              placeholder="url: https://bestreelev..."
-              className="w-full bg-neutral-100 border-neutral-200 text-sm"
-            />
-            {index >= 5 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => removeUrlField(index)}
-                className="h-10 w-10 text-neutral-600 hover:text-red-500"
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Remove</span>
-              </Button>
-            )}
-          </div>
-        ))}
+      <div className="space-y-3">
+        {urls.map((url, index) => {
+          const status = validateUrl(url);
+          return (
+            <div key={index} className="space-y-1">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="url"
+                    value={url}
+                    onChange={(e) => handleUrlChange(index, e.target.value)}
+                    placeholder="url: https://bestreelev..."
+                    className="w-full bg-neutral-100 border-neutral-200 text-sm pr-10"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    {status === 'valid' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                    {status === 'invalid' && <XCircle className="w-4 h-4 text-red-500" />}
+                    {status === 'empty' && <Link className="w-4 h-4 text-neutral-400" />}
+                  </div>
+                </div>
+                {index >= 5 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeUrlField(index)}
+                    className="h-10 w-10 text-neutral-600 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Remove</span>
+                  </Button>
+                )}
+              </div>
+              {status !== 'empty' && (
+                <div className="flex items-center text-xs">
+                  {status === 'valid' ? (
+                    <span className="text-green-600">✓ Valid URL format</span>
+                  ) : (
+                    <span className="text-red-600">✗ Invalid URL format</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
       <Dialog>
         <DialogTrigger asChild>
