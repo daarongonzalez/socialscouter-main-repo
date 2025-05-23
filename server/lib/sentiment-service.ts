@@ -105,10 +105,10 @@ export class SentimentService {
           model: 'gpt-3.5-turbo',
           messages: [{
             role: 'user',
-            content: `Analyze the sentiment of this text and respond with ONLY a JSON object in this exact format: {"sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "confidence": 85}. Text to analyze: "${text}"`
+            content: `Analyze the sentiment of this text and respond with ONLY a JSON object in this exact format: {"sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "confidence": 85, "scores": {"positive": 20, "neutral": 60, "negative": 20}}. The scores should add up to 100. Text to analyze: "${text}"`
           }],
           temperature: 0.1,
-          max_tokens: 50
+          max_tokens: 100
         })
       });
 
@@ -123,7 +123,12 @@ export class SentimentService {
         const result = JSON.parse(content);
         return {
           sentiment: result.sentiment,
-          confidence: result.confidence || 75
+          confidence: result.confidence || 75,
+          scores: result.scores || {
+            positive: result.sentiment === 'POSITIVE' ? 80 : 20,
+            neutral: result.sentiment === 'NEUTRAL' ? 80 : 20,
+            negative: result.sentiment === 'NEGATIVE' ? 80 : 20
+          }
         };
       } catch (parseError) {
         console.error("Failed to parse OpenAI response:", content);
@@ -160,20 +165,32 @@ export class SentimentService {
     });
 
     const totalSentimentWords = positiveScore + negativeScore;
+    const totalWords = words.length;
     
-    if (totalSentimentWords === 0) {
-      return { sentiment: 'NEUTRAL', confidence: 60 };
+    // Calculate percentage scores
+    const positivePercentage = totalWords > 0 ? Math.round((positiveScore / totalWords) * 100) : 0;
+    const negativePercentage = totalWords > 0 ? Math.round((negativeScore / totalWords) * 100) : 0;
+    const neutralPercentage = Math.max(0, 100 - positivePercentage - negativePercentage);
+    
+    // Determine dominant sentiment
+    let dominantSentiment = 'NEUTRAL';
+    if (positivePercentage > negativePercentage && positivePercentage > neutralPercentage) {
+      dominantSentiment = 'POSITIVE';
+    } else if (negativePercentage > positivePercentage && negativePercentage > neutralPercentage) {
+      dominantSentiment = 'NEGATIVE';
     }
+    
+    const confidence = totalSentimentWords > 0 ? Math.min(95, 60 + (totalSentimentWords * 10)) : 60;
 
-    const confidence = Math.min(95, 60 + (totalSentimentWords * 10));
-
-    if (positiveScore > negativeScore) {
-      return { sentiment: 'POSITIVE', confidence };
-    } else if (negativeScore > positiveScore) {
-      return { sentiment: 'NEGATIVE', confidence };
-    } else {
-      return { sentiment: 'NEUTRAL', confidence: Math.max(50, confidence - 10) };
-    }
+    return {
+      sentiment: dominantSentiment,
+      confidence,
+      scores: {
+        positive: positivePercentage,
+        neutral: neutralPercentage,
+        negative: negativePercentage
+      }
+    };
   }
 
   private aggregateAWSSentiments(results: any[]): SentimentResult {
@@ -183,6 +200,9 @@ export class SentimentService {
 
     const sentimentCounts = { POSITIVE: 0, NEGATIVE: 0, NEUTRAL: 0, MIXED: 0 };
     let totalConfidence = 0;
+    let totalPositive = 0;
+    let totalNeutral = 0;
+    let totalNegative = 0;
 
     results.forEach(result => {
       const sentiment = result.Sentiment;
@@ -191,6 +211,11 @@ export class SentimentService {
       const scores = result.SentimentScore;
       const maxScore = Math.max(scores.Positive, scores.Negative, scores.Neutral, scores.Mixed || 0);
       totalConfidence += maxScore * 100;
+      
+      // Aggregate percentage scores
+      totalPositive += scores.Positive * 100;
+      totalNeutral += scores.Neutral * 100;
+      totalNegative += scores.Negative * 100;
     });
 
     // Find dominant sentiment
@@ -198,10 +223,18 @@ export class SentimentService {
       .reduce((a, b) => sentimentCounts[a[0] as keyof typeof sentimentCounts] > sentimentCounts[b[0] as keyof typeof sentimentCounts] ? a : b)[0];
 
     const avgConfidence = Math.round(totalConfidence / results.length);
+    const avgPositive = Math.round(totalPositive / results.length);
+    const avgNeutral = Math.round(totalNeutral / results.length);
+    const avgNegative = Math.round(totalNegative / results.length);
 
     return {
       sentiment: dominantSentiment,
-      confidence: avgConfidence
+      confidence: avgConfidence,
+      scores: {
+        positive: avgPositive,
+        neutral: avgNeutral,
+        negative: avgNegative
+      }
     };
   }
 }

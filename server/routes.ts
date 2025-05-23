@@ -36,6 +36,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let totalWords = 0;
       let totalConfidence = 0;
       const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+      let totalPositiveScore = 0;
+      let totalNeutralScore = 0;
+      let totalNegativeScore = 0;
 
       for (const url of urls) {
         try {
@@ -55,6 +58,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalWords += wordCount;
           totalConfidence += sentimentResult.confidence;
           sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
+
+          // Aggregate sentiment scores if available
+          if (sentimentResult.scores) {
+            totalPositiveScore += sentimentResult.scores.positive;
+            totalNeutralScore += sentimentResult.scores.neutral;
+            totalNegativeScore += sentimentResult.scores.negative;
+          } else {
+            // Fallback: assign 100% to dominant sentiment
+            if (sentimentResult.sentiment === 'POSITIVE') {
+              totalPositiveScore += 100;
+            } else if (sentimentResult.sentiment === 'NEUTRAL') {
+              totalNeutralScore += 100;
+            } else if (sentimentResult.sentiment === 'NEGATIVE') {
+              totalNegativeScore += 100;
+            }
+          }
 
           // Store individual result
           const analysisResult = await storage.createAnalysisResult({
@@ -83,6 +102,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const processingTime = (Date.now() - startTime) / 1000;
       const avgConfidence = totalConfidence / results.length;
 
+      // Calculate average sentiment scores
+      const avgPositiveScore = Math.round(totalPositiveScore / results.length);
+      const avgNeutralScore = Math.round(totalNeutralScore / results.length);
+      const avgNegativeScore = Math.round(totalNegativeScore / results.length);
+
       // Create batch analysis record
       const batchAnalysis = await storage.createBatchAnalysis({
         contentType,
@@ -101,7 +125,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalWords,
           avgConfidence: Math.round(avgConfidence),
           processingTime,
-          sentimentCounts
+          sentimentCounts,
+          sentimentScores: {
+            positive: avgPositiveScore,
+            neutral: avgNeutralScore,
+            negative: avgNegativeScore
+          }
         }
       };
 

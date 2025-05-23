@@ -74,5 +74,10 @@ export interface AnalyzeVideosResponse {
       NEUTRAL: number;
       NEGATIVE: number;
     };
+    sentimentScores: {
+      positive: number;
+      neutral: number;
+      negative: number;
+    };
   };
 }
