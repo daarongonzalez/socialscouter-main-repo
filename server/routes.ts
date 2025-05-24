@@ -87,9 +87,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             platform: contentType,
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
-            positiveScore: sentimentResult.scores?.positive || 0,
-            neutralScore: sentimentResult.scores?.neutral || 0,
-            negativeScore: sentimentResult.scores?.negative || 0,
             transcript: includeTimestamps ? transcript : transcript.replace(/\[\d{2}:\d{2}\]/g, '').trim(),
             wordCount
           });
@@ -112,9 +109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const avgConfidence = totalConfidence / results.length;
 
       // Calculate average sentiment scores
-      const avgPositiveScore = Math.round(totalPositiveScore / results.length);
-      const avgNeutralScore = Math.round(totalNeutralScore / results.length);
-      const avgNegativeScore = Math.round(totalNegativeScore / results.length);
+      const avgPositiveScore = results.length > 0 ? Math.round(totalPositiveScore / results.length) : 0;
+      const avgNeutralScore = results.length > 0 ? Math.round(totalNeutralScore / results.length) : 0;
+      const avgNegativeScore = results.length > 0 ? Math.round(totalNegativeScore / results.length) : 0;
       
       console.log('Sentiment Score Debug:', {
         totalPositiveScore,
