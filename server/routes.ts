@@ -87,6 +87,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             platform: contentType,
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
+            positiveScore: sentimentResult.scores?.positive || 0,
+            neutralScore: sentimentResult.scores?.neutral || 0,
+            negativeScore: sentimentResult.scores?.negative || 0,
             transcript: includeTimestamps ? transcript : transcript.replace(/\[\d{2}:\d{2}\]/g, '').trim(),
             wordCount
           });
