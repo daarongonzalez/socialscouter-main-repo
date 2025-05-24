@@ -35,8 +35,21 @@ export function SummaryStats({ analysisResults }: SummaryStatsProps) {
           <div className="col-span-6 md:col-span-1">
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-neutral-800">Average Score:</h3>
-              <p className="text-xs text-neutral-600">Confidence across analyzed videos</p>
-              <p className="text-4xl font-bold text-neutral-800">{Math.round(avgConfidence)}</p>
+              <p className="text-xs text-neutral-600">Sentiment scores across analyzed videos</p>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-green-600">Positive:</span>
+                  <span className="text-sm font-semibold text-green-600">{positivePercentage}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-orange-600">Neutral:</span>
+                  <span className="text-sm font-semibold text-orange-600">{neutralPercentage}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-red-600">Negative:</span>
+                  <span className="text-sm font-semibold text-red-600">{negativePercentage}%</span>
+                </div>
+              </div>
             </div>
           </div>
 
