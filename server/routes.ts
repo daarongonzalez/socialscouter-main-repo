@@ -106,6 +106,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const avgPositiveScore = Math.round(totalPositiveScore / results.length);
       const avgNeutralScore = Math.round(totalNeutralScore / results.length);
       const avgNegativeScore = Math.round(totalNegativeScore / results.length);
+      
+      console.log('Sentiment Score Debug:', {
+        totalPositiveScore,
+        totalNeutralScore, 
+        totalNegativeScore,
+        resultsLength: results.length,
+        avgPositiveScore,
+        avgNeutralScore,
+        avgNegativeScore
+      });
 
       // Create batch analysis record
       const batchAnalysis = await storage.createBatchAnalysis({
