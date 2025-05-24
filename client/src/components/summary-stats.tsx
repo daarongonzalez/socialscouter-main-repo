@@ -66,12 +66,7 @@ export function SummaryStats({ analysisResults }: SummaryStatsProps) {
             </p>
           </div>
 
-          <div className="col-span-6 md:col-span-1 bg-purple-50 rounded-lg p-4 flex flex-col justify-center items-center">
-            <h3 className="text-sm font-medium text-neutral-800 text-center">Total Words:</h3>
-            <p className="text-4xl font-bold text-purple-600">
-              {totalWords.toLocaleString()}
-            </p>
-          </div>
+
         </div>
       </CardContent>
     </Card>
