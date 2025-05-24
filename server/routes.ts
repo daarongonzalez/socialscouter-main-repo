@@ -53,6 +53,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Analyze sentiment
           const sentimentResult = await sentimentService.analyzeSentiment(transcript);
           
+          console.log(`Sentiment result for ${url}:`, {
+            sentiment: sentimentResult.sentiment,
+            confidence: sentimentResult.confidence,
+            scores: sentimentResult.scores
+          });
+          
           // Count words
           const wordCount = transcript.split(/\s+/).length;
           totalWords += wordCount;
