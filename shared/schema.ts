@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, real, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -6,18 +7,6 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-});
-
-export const analysisResults = pgTable("analysis_results", {
-  id: serial("id").primaryKey(),
-  url: text("url").notNull(),
-  platform: text("platform").notNull(),
-  sentiment: text("sentiment").notNull(),
-  confidence: real("confidence").notNull(),
-  transcript: text("transcript").notNull(),
-  wordCount: integer("word_count").notNull(),
-  sentimentScores: text("sentiment_scores"), // JSON string containing {positive, neutral, negative}
-  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const batchAnalysis = pgTable("batch_analysis", {
@@ -30,6 +19,30 @@ export const batchAnalysis = pgTable("batch_analysis", {
   sentimentCounts: text("sentiment_counts").notNull(), // JSON string
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const analysisResults = pgTable("analysis_results", {
+  id: serial("id").primaryKey(),
+  url: text("url").notNull(),
+  platform: text("platform").notNull(),
+  sentiment: text("sentiment").notNull(),
+  confidence: real("confidence").notNull(),
+  transcript: text("transcript").notNull(),
+  wordCount: integer("word_count").notNull(),
+  sentimentScores: text("sentiment_scores"), // JSON string containing {positive, neutral, negative}
+  batchId: integer("batch_id").references(() => batchAnalysis.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const batchAnalysisRelations = relations(batchAnalysis, ({ many }) => ({
+  analysisResults: many(analysisResults),
+}));
+
+export const analysisResultsRelations = relations(analysisResults, ({ one }) => ({
+  batch: one(batchAnalysis, {
+    fields: [analysisResults.batchId],
+    references: [batchAnalysis.id],
+  }),
+}));
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
