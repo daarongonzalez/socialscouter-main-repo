@@ -9,15 +9,43 @@ interface AnalysisResultsProps {
 }
 
 export function AnalysisResults({ results }: AnalysisResultsProps) {
-  const getSentimentPercentages = (sentiment: string, confidence: number) => {
-    // Convert sentiment analysis result to percentage format for the circle
-    switch (sentiment.toUpperCase()) {
+  const getSentimentPercentages = (result: AnalysisResult) => {
+    // Try to use stored sentiment scores if available
+    if (result.sentimentScores) {
+      try {
+        const scores = JSON.parse(result.sentimentScores);
+        return {
+          positive: Math.round(scores.positive || 0),
+          neutral: Math.round(scores.neutral || 0),
+          negative: Math.round(scores.negative || 0)
+        };
+      } catch (e) {
+        console.warn('Failed to parse sentiment scores:', e);
+      }
+    }
+    
+    // Fallback to confidence-based calculation
+    const confidence = result.confidence;
+    
+    switch (result.sentiment.toUpperCase()) {
       case 'POSITIVE':
-        return { positive: confidence, neutral: (100 - confidence) / 2, negative: (100 - confidence) / 2 }
+        return { 
+          positive: Math.max(60, confidence), 
+          neutral: Math.max(10, (100 - confidence) / 2), 
+          negative: Math.max(5, (100 - confidence) / 2) 
+        }
       case 'NEGATIVE':
-        return { positive: (100 - confidence) / 2, neutral: (100 - confidence) / 2, negative: confidence }
+        return { 
+          positive: Math.max(5, (100 - confidence) / 2), 
+          neutral: Math.max(10, (100 - confidence) / 2), 
+          negative: Math.max(60, confidence) 
+        }
       default: // NEUTRAL
-        return { positive: (100 - confidence) / 2, neutral: confidence, negative: (100 - confidence) / 2 }
+        return { 
+          positive: Math.max(5, (100 - confidence) / 3), 
+          neutral: Math.max(60, confidence), 
+          negative: Math.max(5, (100 - confidence) / 3) 
+        }
     }
   }
 
@@ -32,7 +60,7 @@ export function AnalysisResults({ results }: AnalysisResultsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {results.map((result, index) => {
-        const percentages = getSentimentPercentages(result.sentiment, result.confidence)
+        const percentages = getSentimentPercentages(result)
         
         return (
           <Card

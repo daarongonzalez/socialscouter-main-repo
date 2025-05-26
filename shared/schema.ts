@@ -16,6 +16,7 @@ export const analysisResults = pgTable("analysis_results", {
   confidence: real("confidence").notNull(),
   transcript: text("transcript").notNull(),
   wordCount: integer("word_count").notNull(),
+  sentimentScores: text("sentiment_scores"), // JSON string containing {positive, neutral, negative}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
