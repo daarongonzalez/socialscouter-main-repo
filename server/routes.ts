@@ -88,7 +88,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
             transcript: includeTimestamps ? transcript : transcript.replace(/\[\d{2}:\d{2}\]/g, '').trim(),
-            wordCount
+            wordCount,
+            sentimentScores: sentimentResult.scores ? JSON.stringify(sentimentResult.scores) : null
           });
 
           results.push(analysisResult);
