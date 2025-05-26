@@ -10,7 +10,7 @@ import {
   type InsertBatchAnalysis
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -22,6 +22,7 @@ export interface IStorage {
   
   createBatchAnalysis(batch: InsertBatchAnalysis): Promise<BatchAnalysis>;
   getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined>;
+  getAllBatchAnalyses(): Promise<BatchAnalysis[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -96,6 +97,10 @@ export class MemStorage implements IStorage {
   async getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined> {
     return this.batchAnalyses.get(id);
   }
+
+  async getAllBatchAnalyses(): Promise<BatchAnalysis[]> {
+    return Array.from(this.batchAnalyses.values()).sort((a, b) => b.id - a.id);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -146,6 +151,13 @@ export class DatabaseStorage implements IStorage {
       .from(batchAnalysisTable)
       .where(eq(batchAnalysisTable.id, id));
     return batch || undefined;
+  }
+
+  async getAllBatchAnalyses(): Promise<BatchAnalysis[]> {
+    return await db
+      .select()
+      .from(batchAnalysisTable)
+      .orderBy(desc(batchAnalysisTable.id));
   }
 }
 
