@@ -1,7 +1,7 @@
 import { 
   users, 
   analysisResults, 
-  batchAnalysis,
+  batchAnalysis as batchAnalysisTable,
   type User, 
   type InsertUser,
   type AnalysisResult,
@@ -9,6 +9,8 @@ import {
   type BatchAnalysis,
   type InsertBatchAnalysis
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -89,4 +91,55 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult> {
+    const [analysisResult] = await db
+      .insert(analysisResults)
+      .values(result)
+      .returning();
+    return analysisResult;
+  }
+
+  async getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]> {
+    return await db
+      .select()
+      .from(analysisResults)
+      .where(eq(analysisResults.batchId, batchId));
+  }
+
+  async createBatchAnalysis(batch: InsertBatchAnalysis): Promise<BatchAnalysis> {
+    const [result] = await db
+      .insert(batchAnalysisTable)
+      .values(batch)
+      .returning();
+    return result;
+  }
+
+  async getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined> {
+    const [batch] = await db
+      .select()
+      .from(batchAnalysisTable)
+      .where(eq(batchAnalysisTable.id, id));
+    return batch || undefined;
+  }
+}
+
+export const storage = new DatabaseStorage();
