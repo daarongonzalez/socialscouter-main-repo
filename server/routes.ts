@@ -31,6 +31,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { urls, contentType, includeTimestamps } = validationResult.data;
 
+      // Create batch analysis record first (with placeholder data)
+      const batchAnalysis = await storage.createBatchAnalysis({
+        contentType,
+        totalVideos: urls.length,
+        totalWords: 0, // Will be updated
+        avgConfidence: 0, // Will be updated  
+        processingTime: 0, // Will be updated
+        sentimentCounts: JSON.stringify({ POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 })
+      });
+
       // Process each video URL
       const results = [];
       let totalWords = 0;
@@ -69,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalNegativeScore += sentimentResult.scores.negative;
           }
 
-          // Store analysis result
+          // Store analysis result with the correct batch ID
           const analysisResult = await storage.createAnalysisResult({
             url,
             platform: contentType,
@@ -78,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transcript,
             wordCount,
             sentimentScores: JSON.stringify(sentimentResult.scores || {}),
-            batchId: 0 // Will be updated after batch creation
+            batchId: batchAnalysis.id
           });
 
           results.push(analysisResult);
@@ -112,16 +122,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgPositiveScore,
         avgNeutralScore,
         avgNegativeScore
-      });
-
-      // Create batch analysis record
-      const batchAnalysis = await storage.createBatchAnalysis({
-        contentType,
-        totalVideos: results.length,
-        totalWords,
-        avgConfidence,
-        processingTime,
-        sentimentCounts: JSON.stringify(sentimentCounts)
       });
 
       const response: AnalyzeVideosResponse = {
