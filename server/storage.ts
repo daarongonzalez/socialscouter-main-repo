@@ -61,8 +61,15 @@ export class MemStorage implements IStorage {
   async createAnalysisResult(insertResult: InsertAnalysisResult): Promise<AnalysisResult> {
     const id = this.currentAnalysisId++;
     const result: AnalysisResult = { 
-      ...insertResult, 
       id,
+      url: insertResult.url,
+      platform: insertResult.platform,
+      sentiment: insertResult.sentiment,
+      confidence: insertResult.confidence,
+      transcript: insertResult.transcript,
+      wordCount: insertResult.wordCount,
+      sentimentScores: insertResult.sentimentScores ?? null,
+      batchId: insertResult.batchId ?? null,
       createdAt: new Date()
     };
     this.analysisResults.set(id, result);
