@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 const overallStats = {
   totalAnalyses: 47,
   totalVideos: 235,
-  averageScore: 38,
+  sentimentScore: 38,
   description: "Across all your analyzed content, this is your aggregated sentiment score.",
   overallTrend: "+3.2%",
   positiveMentions: "+45%",
@@ -23,8 +23,10 @@ export function HistoryOverview() {
             <h3 className="text-sm font-medium text-neutral-darkest">Total Average Score:</h3>
             <p className="text-xs text-neutral-dark">{overallStats.description}</p>
             <div className="flex items-end gap-2">
-              <p className="text-4xl font-bold text-neutral-darkest">{overallStats.averageScore}</p>
-              <p className="text-sm font-medium text-success pb-1">{overallStats.overallTrend}</p>
+              <p className="text-4xl font-bold text-neutral-darkest">{overallStats.sentimentScore}</p>
+              <p className={`text-sm font-medium pb-1 ${overallStats.overallTrend.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                {overallStats.overallTrend}
+              </p>
             </div>
           </div>
 
