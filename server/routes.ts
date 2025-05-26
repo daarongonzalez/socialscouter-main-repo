@@ -52,71 +52,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Analyze sentiment
           const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+          console.log(`Sentiment result for ${url}:`, sentimentResult);
           
-          console.log(`Sentiment result for ${url}:`, {
-            sentiment: sentimentResult.sentiment,
-            confidence: sentimentResult.confidence,
-            scores: sentimentResult.scores
-          });
-          
-          // Count words
+          // Count words in transcript
           const wordCount = transcript.split(/\s+/).length;
           totalWords += wordCount;
           totalConfidence += sentimentResult.confidence;
+
+          // Count sentiment occurrences
           sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
 
-          // Aggregate sentiment scores if available
+          // Accumulate scores for averaging
           if (sentimentResult.scores) {
             totalPositiveScore += sentimentResult.scores.positive;
             totalNeutralScore += sentimentResult.scores.neutral;
             totalNegativeScore += sentimentResult.scores.negative;
-          } else {
-            // Fallback: assign 100% to dominant sentiment
-            if (sentimentResult.sentiment === 'POSITIVE') {
-              totalPositiveScore += 100;
-            } else if (sentimentResult.sentiment === 'NEUTRAL') {
-              totalNeutralScore += 100;
-            } else if (sentimentResult.sentiment === 'NEGATIVE') {
-              totalNegativeScore += 100;
-            }
           }
 
-          // Store individual result
+          // Store analysis result
           const analysisResult = await storage.createAnalysisResult({
             url,
             platform: contentType,
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
-            transcript: includeTimestamps ? transcript : transcript.replace(/\[\d{2}:\d{2}\]/g, '').trim(),
+            transcript,
             wordCount,
-            sentimentScores: sentimentResult.scores ? JSON.stringify(sentimentResult.scores) : null
+            sentimentScores: JSON.stringify(sentimentResult.scores || {}),
+            batchId: 0 // Will be updated after batch creation
           });
 
           results.push(analysisResult);
         } catch (error) {
           console.error(`Error processing URL ${url}:`, error);
-          // Continue with other URLs instead of failing the entire batch
+          // Continue with other URLs even if one fails
         }
       }
 
       if (results.length === 0) {
         return res.status(400).json({
           error: "No videos could be processed",
-          message: "All provided URLs failed to process. Please check that the URLs are valid and publicly accessible."
+          message: "Please check your URLs and try again."
         });
       }
 
-      const processingTime = (Date.now() - startTime) / 1000;
+      // Calculate averages
       const avgConfidence = totalConfidence / results.length;
+      const processingTime = Date.now() - startTime;
 
       // Calculate average sentiment scores
-      const avgPositiveScore = results.length > 0 ? Math.round(totalPositiveScore / results.length) : 0;
-      const avgNeutralScore = results.length > 0 ? Math.round(totalNeutralScore / results.length) : 0;
-      const avgNegativeScore = results.length > 0 ? Math.round(totalNegativeScore / results.length) : 0;
-      
-      console.log('Sentiment Score Debug:', {
+      const avgPositiveScore = Math.round(totalPositiveScore / results.length);
+      const avgNeutralScore = Math.round(totalNeutralScore / results.length);
+      const avgNegativeScore = Math.round(totalNegativeScore / results.length);
+
+      console.log("Sentiment Score Debug:", {
         totalPositiveScore,
-        totalNeutralScore, 
+        totalNeutralScore,
         totalNegativeScore,
         resultsLength: results.length,
         avgPositiveScore,
