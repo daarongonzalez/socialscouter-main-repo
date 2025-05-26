@@ -181,7 +181,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results
       });
     } catch (error) {
-      console.error("Error getting batch analysis:", error);
+      console.error("Error fetching batch analysis:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get all batch analyses for history
+  app.get("/api/history", async (req, res) => {
+    try {
+      const batches = await storage.getAllBatchAnalyses();
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -189,3 +200,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+
+export { registerRoutes };
