@@ -31,29 +31,8 @@ export function SummaryStats({ analysisResults }: SummaryStatsProps) {
   return (
     <Card className="bg-neutral-100 border-neutral-200">
       <CardContent className="p-6">
-        <div className="grid grid-cols-6 gap-4">
-          <div className="col-span-6 md:col-span-1">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-neutral-800">Average Score:</h3>
-              <p className="text-xs text-neutral-600">Sentiment scores across analyzed videos</p>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-green-600">Positive:</span>
-                  <span className="text-sm font-semibold text-green-600">{positivePercentage}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-orange-600">Neutral:</span>
-                  <span className="text-sm font-semibold text-orange-600">{neutralPercentage}%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-red-600">Negative:</span>
-                  <span className="text-sm font-semibold text-red-600">{negativePercentage}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-span-6 md:col-span-1 bg-blue-50 rounded-lg p-4 flex flex-col justify-center items-center">
+        <div className="grid grid-cols-5 gap-4">
+          <div className="col-span-5 md:col-span-1 bg-blue-50 rounded-lg p-4 flex flex-col justify-center items-center">
             <h3 className="text-sm font-medium text-neutral-800 text-center">Videos Analyzed:</h3>
             <p className="text-4xl font-bold text-blue-600">{totalVideos}</p>
           </div>
