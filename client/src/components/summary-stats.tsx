@@ -31,34 +31,39 @@ export function SummaryStats({ analysisResults }: SummaryStatsProps) {
   return (
     <Card className="bg-neutral-100 border-neutral-200">
       <CardContent className="p-6">
-        <div className="grid grid-cols-5 gap-4">
-          <div className="col-span-5 md:col-span-1 bg-blue-50 rounded-lg p-4 flex flex-col justify-center items-center">
-            <h3 className="text-sm font-medium text-neutral-800 text-center">Videos Analyzed:</h3>
-            <p className="text-4xl font-bold text-blue-600">{totalVideos}</p>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-neutral-800">Average Score:</h3>
+            <p className="text-xs text-neutral-600">Sentiment scores across analyzed videos</p>
           </div>
+          
+          <div className="grid grid-cols-4 gap-4">
+            <div className="col-span-4 md:col-span-1 bg-blue-50 rounded-lg p-4 flex flex-col justify-center items-center">
+              <h3 className="text-sm font-medium text-neutral-800 text-center">Videos Analyzed:</h3>
+              <p className="text-4xl font-bold text-blue-600">{totalVideos}</p>
+            </div>
 
-          <div className="col-span-6 md:col-span-1 bg-green-50 rounded-lg p-4 flex flex-col justify-center items-center">
-            <h3 className="text-sm font-medium text-neutral-800 text-center">Positive:</h3>
-            <p className="text-4xl font-bold text-[#4CAF50]">
-              {positivePercentage}%
-            </p>
+            <div className="col-span-4 md:col-span-1 bg-green-50 rounded-lg p-4 flex flex-col justify-center items-center">
+              <h3 className="text-sm font-medium text-neutral-800 text-center">Positive:</h3>
+              <p className="text-4xl font-bold text-[#4CAF50]">
+                {positivePercentage}%
+              </p>
+            </div>
+
+            <div className="col-span-4 md:col-span-1 bg-yellow-50 rounded-lg p-4 flex flex-col justify-center items-center">
+              <h3 className="text-sm font-medium text-neutral-800 text-center">Neutral:</h3>
+              <p className="text-4xl font-bold text-[#FFB260]">
+                {neutralPercentage}%
+              </p>
+            </div>
+
+            <div className="col-span-4 md:col-span-1 bg-red-50 rounded-lg p-4 flex flex-col justify-center items-center">
+              <h3 className="text-sm font-medium text-neutral-800 text-center">Negative:</h3>
+              <p className="text-4xl font-bold text-[#FF5757]">
+                {negativePercentage}%
+              </p>
+            </div>
           </div>
-
-          <div className="col-span-6 md:col-span-1 bg-yellow-50 rounded-lg p-4 flex flex-col justify-center items-center">
-            <h3 className="text-sm font-medium text-neutral-800 text-center">Neutral:</h3>
-            <p className="text-4xl font-bold text-[#FFB260]">
-              {neutralPercentage}%
-            </p>
-          </div>
-
-          <div className="col-span-6 md:col-span-1 bg-red-50 rounded-lg p-4 flex flex-col justify-center items-center">
-            <h3 className="text-sm font-medium text-neutral-800 text-center">Negative:</h3>
-            <p className="text-4xl font-bold text-[#FF5757]">
-              {negativePercentage}%
-            </p>
-          </div>
-
-
         </div>
       </CardContent>
     </Card>
