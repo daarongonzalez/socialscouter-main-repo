@@ -3,7 +3,7 @@ import {
   analysisResults, 
   batchAnalysis as batchAnalysisTable,
   type User, 
-  type InsertUser,
+  type UpsertUser,
   type AnalysisResult,
   type InsertAnalysisResult,
   type BatchAnalysis,
@@ -13,9 +13,10 @@ import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // User operations for Replit Auth
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   
   createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult>;
   getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]>;
@@ -23,6 +24,7 @@ export interface IStorage {
   createBatchAnalysis(batch: InsertBatchAnalysis): Promise<BatchAnalysis>;
   getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined>;
   getAllBatchAnalyses(): Promise<BatchAnalysis[]>;
+  getUserBatchAnalyses(userId: string): Promise<BatchAnalysis[]>;
 }
 
 export class MemStorage implements IStorage {
