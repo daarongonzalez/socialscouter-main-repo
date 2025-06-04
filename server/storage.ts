@@ -1,19 +1,21 @@
-import { 
-  users, 
-  analysisResults, 
-  batchAnalysis as batchAnalysisTable,
-  type User, 
+import {
+  users,
+  analysisResults,
+  batchAnalysis,
+  type User,
   type UpsertUser,
   type AnalysisResult,
   type InsertAnalysisResult,
   type BatchAnalysis,
-  type InsertBatchAnalysis
+  type InsertBatchAnalysis,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
+// Interface for storage operations
 export interface IStorage {
-  // User operations for Replit Auth
+  // User operations
+  // (IMPORTANT) these user operations are mandatory for Replit Auth.
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
@@ -27,99 +29,39 @@ export interface IStorage {
   getUserBatchAnalyses(userId: string): Promise<BatchAnalysis[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private analysisResults: Map<number, AnalysisResult>;
-  private batchAnalyses: Map<number, BatchAnalysis>;
-  private currentUserId: number;
-  private currentAnalysisId: number;
-  private currentBatchId: number;
+export class DatabaseStorage implements IStorage {
+  // User operations
+  // (IMPORTANT) these user operations are mandatory for Replit Auth.
 
-  constructor() {
-    this.users = new Map();
-    this.analysisResults = new Map();
-    this.batchAnalyses = new Map();
-    this.currentUserId = 1;
-    this.currentAnalysisId = 1;
-    this.currentBatchId = 1;
-  }
-
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
-  async createAnalysisResult(insertResult: InsertAnalysisResult): Promise<AnalysisResult> {
-    const id = this.currentAnalysisId++;
-    const result: AnalysisResult = { 
-      id,
-      url: insertResult.url,
-      platform: insertResult.platform,
-      sentiment: insertResult.sentiment,
-      confidence: insertResult.confidence,
-      transcript: insertResult.transcript,
-      wordCount: insertResult.wordCount,
-      sentimentScores: insertResult.sentimentScores ?? null,
-      batchId: insertResult.batchId ?? null,
-      createdAt: new Date()
-    };
-    this.analysisResults.set(id, result);
-    return result;
-  }
-
-  async getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]> {
-    // Since we're using in-memory storage, we'll store batchId in a way that allows querying
-    // For simplicity, we'll return all results for now
-    return Array.from(this.analysisResults.values());
-  }
-
-  async createBatchAnalysis(insertBatch: InsertBatchAnalysis): Promise<BatchAnalysis> {
-    const id = this.currentBatchId++;
-    const batch: BatchAnalysis = { 
-      ...insertBatch, 
-      id,
-      createdAt: new Date()
-    };
-    this.batchAnalyses.set(id, batch);
-    return batch;
-  }
-
-  async getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined> {
-    return this.batchAnalyses.get(id);
-  }
-
-  async getAllBatchAnalyses(): Promise<BatchAnalysis[]> {
-    return Array.from(this.batchAnalyses.values()).sort((a, b) => b.id - a.id);
-  }
-}
-
-export class DatabaseStorage implements IStorage {
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(insertUser)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        stripeCustomerId,
+        stripeSubscriptionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
       .returning();
     return user;
   }
@@ -141,7 +83,7 @@ export class DatabaseStorage implements IStorage {
 
   async createBatchAnalysis(batch: InsertBatchAnalysis): Promise<BatchAnalysis> {
     const [result] = await db
-      .insert(batchAnalysisTable)
+      .insert(batchAnalysis)
       .values(batch)
       .returning();
     return result;
@@ -150,16 +92,24 @@ export class DatabaseStorage implements IStorage {
   async getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined> {
     const [batch] = await db
       .select()
-      .from(batchAnalysisTable)
-      .where(eq(batchAnalysisTable.id, id));
+      .from(batchAnalysis)
+      .where(eq(batchAnalysis.id, id));
     return batch || undefined;
   }
 
   async getAllBatchAnalyses(): Promise<BatchAnalysis[]> {
     return await db
       .select()
-      .from(batchAnalysisTable)
-      .orderBy(desc(batchAnalysisTable.id));
+      .from(batchAnalysis)
+      .orderBy(desc(batchAnalysis.id));
+  }
+
+  async getUserBatchAnalyses(userId: string): Promise<BatchAnalysis[]> {
+    return await db
+      .select()
+      .from(batchAnalysis)
+      .where(eq(batchAnalysis.userId, userId))
+      .orderBy(desc(batchAnalysis.id));
   }
 }
 
