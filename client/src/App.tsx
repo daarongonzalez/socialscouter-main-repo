@@ -21,6 +21,7 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/history" component={HistoryPage} />
+          <Route path="/subscribe" component={Subscribe} />
         </>
       )}
       <Route component={NotFound} />
