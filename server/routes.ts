@@ -5,18 +5,42 @@ import { analyzeVideosSchema, type AnalyzeVideosRequest, type AnalyzeVideosRespo
 import { ZodError } from "zod";
 import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import Stripe from "stripe";
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-04-30.basil",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Analyze videos endpoint
-  app.post("/api/analyze", async (req, res) => {
+  // Analyze videos endpoint - now requires authentication
+  app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
       
@@ -30,9 +54,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { urls, contentType, includeTimestamps } = validationResult.data;
+      const userId = req.user.claims.sub;
 
       // Create batch analysis record first (with placeholder data)
       const batchAnalysis = await storage.createBatchAnalysis({
+        userId,
         contentType,
         totalVideos: urls.length,
         totalWords: 0, // Will be updated
@@ -176,14 +202,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all batch analyses for history
-  app.get("/api/history", async (req, res) => {
+  // Get user's batch analyses for history
+  app.get("/api/history", isAuthenticated, async (req: any, res) => {
     try {
-      const batches = await storage.getAllBatchAnalyses();
+      const userId = req.user.claims.sub;
+      const batches = await storage.getUserBatchAnalyses(userId);
       res.json(batches);
     } catch (error) {
       console.error("Error fetching history:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Stripe subscription routes
+  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { priceId, planName } = req.body;
+
+      if (!user?.email) {
+        return res.status(400).json({ error: 'User email is required' });
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create customer if doesn't exist
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, '');
+      }
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        payment_behavior: 'default_incomplete',
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with subscription info
+      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+      });
+    } catch (error: any) {
+      console.error('Subscription creation error:', error);
+      res.status(400).json({ error: error.message });
     }
   });
 
