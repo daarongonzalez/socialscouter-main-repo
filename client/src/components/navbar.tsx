@@ -28,7 +28,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <span className="text-2xl">🐵</span>
+              <img src="/assets/icon-name-small.png" alt="SocialScouter" className="w-8 h-8" />
               <span className="text-xl font-bold text-neutral-800">SocialScouter</span>
             </Link>
           </div>
