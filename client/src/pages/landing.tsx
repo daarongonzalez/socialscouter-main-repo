@@ -21,23 +21,25 @@ export default function LoginPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" style={{ 
+      background: `linear-gradient(135deg, hsl(var(--blue-ribbon-50)), hsl(var(--blue-ribbon-100)), hsl(var(--tree-poppy-50)))` 
+    }}>
       {/* Header */}
       <header className="w-full py-4 px-6">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Blog</span>
-            <span className="text-sm text-gray-600">Products</span>
+            <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Blog</span>
+            <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Products</span>
           </div>
           
           <div className="flex items-center gap-2">
             <img src={iconNameSmall} alt="SocialScouter" className="w-8 h-8" />
-            <span className="font-semibold text-gray-800">SocialScouter</span>
+            <span className="font-semibold" style={{ color: 'hsl(var(--neutral-800))' }}>SocialScouter</span>
           </div>
           
           <Button 
             variant="default" 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+            className="bg-blue-ribbon hover:opacity-90 text-white px-6"
             onClick={handleReplotLogin}
           >
             Admin
@@ -47,26 +49,26 @@ export default function LoginPortal() {
 
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center px-4 py-16">
-        <h1 className="text-4xl font-bold text-gray-800 mb-16 text-center">
+        <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
           {isSignUp ? "We're Stoked You're Here!" : "You're Almost There!"}
         </h1>
 
         {/* Login/Signup Form */}
-        <Card className="w-full max-w-md bg-white border border-gray-200 shadow-lg">
+        <Card className="w-full max-w-md bg-card border shadow-lg" style={{ borderColor: 'hsl(var(--border))' }}>
           <CardContent className="p-8">
             <div className="flex flex-col items-center mb-6">
               <img src={iconNameSmall} alt="SocialScouter" className="w-12 h-12 mb-4" />
-              <span className="font-semibold text-gray-800 mb-2">SocialScouter</span>
+              <span className="font-semibold mb-2" style={{ color: 'hsl(var(--neutral-800))' }}>SocialScouter</span>
               
               {isSignUp ? (
                 <>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-1">Welcome!</h2>
-                  <p className="text-sm text-gray-600 text-center">Sign up to create your account</p>
+                  <h2 className="text-xl font-semibold mb-1" style={{ color: 'hsl(var(--neutral-800))' }}>Welcome!</h2>
+                  <p className="text-sm text-center" style={{ color: 'hsl(var(--neutral-500))' }}>Sign up to create your account</p>
                 </>
               ) : (
                 <>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-1">Welcome Back!</h2>
-                  <p className="text-sm text-gray-600 text-center">Sign in to continue to your account</p>
+                  <h2 className="text-xl font-semibold mb-1" style={{ color: 'hsl(var(--neutral-800))' }}>Welcome Back!</h2>
+                  <p className="text-sm text-center" style={{ color: 'hsl(var(--neutral-500))' }}>Sign in to continue to your account</p>
                 </>
               )}
             </div>
@@ -74,7 +76,7 @@ export default function LoginPortal() {
             <form className="space-y-4">
               {isSignUp && (
                 <div>
-                  <Label htmlFor="fullName" className="text-sm text-gray-700">
+                  <Label htmlFor="fullName" className="text-sm" style={{ color: 'hsl(var(--neutral-600))' }}>
                     Full Name / Business Name
                   </Label>
                   <Input
@@ -82,14 +84,14 @@ export default function LoginPortal() {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="mt-1 w-full border-gray-300 rounded-md"
+                    className="mt-1 w-full rounded-md border-input"
                     placeholder="Enter your full name"
                   />
                 </div>
               )}
 
               <div>
-                <Label htmlFor="email" className="text-sm text-gray-700">
+                <Label htmlFor="email" className="text-sm" style={{ color: 'hsl(var(--neutral-600))' }}>
                   Email
                 </Label>
                 <Input
@@ -97,13 +99,13 @@ export default function LoginPortal() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full border-gray-300 rounded-md"
+                  className="mt-1 w-full rounded-md border-input"
                   placeholder="Enter your email"
                 />
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-sm text-gray-700">
+                <Label htmlFor="password" className="text-sm" style={{ color: 'hsl(var(--neutral-600))' }}>
                   Password
                 </Label>
                 <Input
@@ -111,14 +113,14 @@ export default function LoginPortal() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full border-gray-300 rounded-md"
+                  className="mt-1 w-full rounded-md border-input"
                   placeholder="Enter your password"
                 />
               </div>
 
               {isSignUp && (
                 <div>
-                  <Label htmlFor="confirmPassword" className="text-sm text-gray-700">
+                  <Label htmlFor="confirmPassword" className="text-sm" style={{ color: 'hsl(var(--neutral-600))' }}>
                     Confirm Password
                   </Label>
                   <Input
@@ -126,7 +128,7 @@ export default function LoginPortal() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="mt-1 w-full border-gray-300 rounded-md"
+                    className="mt-1 w-full rounded-md border-input"
                     placeholder="Confirm your password"
                   />
                 </div>
@@ -134,7 +136,7 @@ export default function LoginPortal() {
 
               <Button 
                 type="button"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md mt-6"
+                className="w-full bg-blue-ribbon hover:opacity-90 text-white py-2 rounded-md mt-6"
                 onClick={handleReplotLogin}
               >
                 {isSignUp ? "Sign Up" : "Sign In"}
@@ -144,17 +146,18 @@ export default function LoginPortal() {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
+                  <div className="w-full border-t" style={{ borderColor: 'hsl(var(--border))' }} />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">OR CONTINUE WITH</span>
+                  <span className="px-2 bg-card" style={{ color: 'hsl(var(--neutral-500))' }}>OR CONTINUE WITH</span>
                 </div>
               </div>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full mt-4 border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="w-full mt-4 border hover:bg-muted"
+                style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--neutral-600))' }}
                 onClick={handleGoogleLogin}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -170,7 +173,7 @@ export default function LoginPortal() {
             <div className="mt-6 text-center">
               <button
                 type="button"
-                className="text-sm text-orange-500 hover:text-orange-600"
+                className="text-sm text-tree-poppy hover:opacity-80"
                 onClick={() => setIsSignUp(!isSignUp)}
               >
                 {isSignUp 
