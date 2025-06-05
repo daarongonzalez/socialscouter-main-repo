@@ -38,12 +38,9 @@ export default function LoginPortal() {
             variant="default" 
             className="bg-blue-ribbon hover:opacity-90 text-white px-6"
             onClick={handleReplotLogin}
-          >
-            Admin
-          </Button>
+          >Login</Button>
         </div>
       </header>
-
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center px-4 py-16">
         <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
