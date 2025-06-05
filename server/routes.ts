@@ -207,17 +207,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get batch analysis results
-  app.get("/api/batch/:id", async (req, res) => {
+  // Get batch analysis results - requires authentication and ownership verification
+  app.get("/api/batch/:id", isAuthenticated, async (req: any, res) => {
     try {
       const batchId = parseInt(req.params.id);
       if (isNaN(batchId)) {
         return res.status(400).json({ error: "Invalid batch ID" });
       }
 
+      const userId = req.user.claims.sub;
       const batchAnalysis = await storage.getBatchAnalysis(batchId);
+      
       if (!batchAnalysis) {
         return res.status(404).json({ error: "Batch analysis not found" });
+      }
+
+      // Verify ownership - user can only access their own batch analyses
+      if (batchAnalysis.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       const results = await storage.getAnalysisResultsByBatchId(batchId);
