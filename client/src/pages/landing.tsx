@@ -34,7 +34,6 @@ export default function LoginPortal() {
           
           <div className="flex items-center gap-2">
             <img src={iconNameSmall} alt="SocialScouter" className="w-8 h-8" />
-            <span className="font-semibold" style={{ color: 'hsl(var(--neutral-800))' }}>SocialScouter</span>
           </div>
           
           <Button 
