@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { csrfMiddleware } from "./lib/csrf-middleware";
 
 const app = express();
 
@@ -60,6 +61,15 @@ app.use('/api/analyze', analysisLimiter);
 // JSON parsing for all other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// CSRF protection for all routes except webhooks
+app.use((req, res, next) => {
+  // Skip CSRF for webhooks and health checks
+  if (req.path.startsWith('/api/stripe/webhook') || req.path === '/api/health') {
+    return next();
+  }
+  csrfMiddleware(req, res, next);
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
