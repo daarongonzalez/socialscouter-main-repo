@@ -12,6 +12,12 @@ if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
 }
 
+// Ensure app.socialscouter.ai is included in the domains
+const domains = process.env.REPLIT_DOMAINS.split(",").map(d => d.trim());
+if (!domains.includes("app.socialscouter.ai")) {
+  domains.push("app.socialscouter.ai");
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -84,8 +90,7 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  for (const domain of domains) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,
