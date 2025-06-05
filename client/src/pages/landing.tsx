@@ -21,9 +21,7 @@ export default function LoginPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" style={{ 
-      background: `linear-gradient(135deg, hsl(var(--blue-ribbon-50)), hsl(var(--blue-ribbon-100)), hsl(var(--tree-poppy-50)))` 
-    }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'hsl(var(--neutral-50))' }}>
       {/* Header */}
       <header className="w-full py-4 px-6">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -33,7 +31,7 @@ export default function LoginPortal() {
           </div>
           
           <div className="flex items-center gap-2">
-            <img src={iconNameSmall} alt="SocialScouter" className="w-8 h-8" />
+            <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
           </div>
           
           <Button 
@@ -53,10 +51,10 @@ export default function LoginPortal() {
         </h1>
 
         {/* Login/Signup Form */}
-        <Card className="w-full max-w-md bg-card border shadow-lg" style={{ borderColor: 'hsl(var(--border))' }}>
+        <Card className="w-full max-w-md bg-card border shadow-lg" style={{ borderColor: 'hsl(var(--blue-ribbon-500))', borderWidth: '1px' }}>
           <CardContent className="p-8">
             <div className="flex flex-col items-center mb-6">
-              <img src={iconNameSmall} alt="SocialScouter" className="w-12 h-12 mb-4" />
+              <img src={iconNameSmall} alt="SocialScouter" className="h-12 object-contain mb-4" />
               
               {isSignUp ? (
                 <>
