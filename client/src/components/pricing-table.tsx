@@ -87,50 +87,52 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
         A Plan for Any Size Team
       </h2>
       
-      {/* Save 20% Callout */}
-      <div className="flex justify-center mb-4">
-        <div className="relative">
-          <div 
-            className="px-3 py-1 rounded-full text-sm font-medium text-white"
-            style={{ backgroundColor: 'hsl(var(--tree-poppy-500))' }}
-          >
-            Save 20%
-          </div>
-          <div 
-            className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1"
-            style={{ color: 'hsl(var(--tree-poppy-500))' }}
-          >
-            <svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor">
-              <path d="M6 8L0 0h12L6 8z"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-      
-      {/* Monthly/Yearly Toggle */}
+      {/* Monthly/Yearly Toggle with Save 20% Callout */}
       <div className="flex justify-center mb-8">
-        <div className="flex items-center bg-white border rounded-full p-1" style={{ borderColor: 'hsl(var(--border))' }}>
-          <button
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              !isYearly 
-                ? 'bg-blue-ribbon text-white' 
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            onClick={() => setIsYearly(false)}
-          >
-            Monthly
-          </button>
-          <span className="mx-1 text-gray-400">|</span>
-          <button
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              isYearly 
-                ? 'bg-blue-ribbon text-white' 
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-            onClick={() => setIsYearly(true)}
-          >
-            Yearly
-          </button>
+        <div className="relative">
+          {/* Save 20% Callout positioned above Yearly */}
+          <div className="absolute -top-12 right-6">
+            <div className="relative">
+              <div 
+                className="px-3 py-1 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: 'hsl(var(--tree-poppy-500))' }}
+              >
+                Save 20%
+              </div>
+              <div 
+                className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1"
+                style={{ color: 'hsl(var(--tree-poppy-500))' }}
+              >
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor">
+                  <path d="M6 8L0 0h12L6 8z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center bg-white border rounded-full p-1" style={{ borderColor: 'hsl(var(--border))' }}>
+            <button
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                !isYearly 
+                  ? 'bg-blue-ribbon text-white' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setIsYearly(false)}
+            >
+              Monthly
+            </button>
+            <span className="mx-1 text-gray-400">|</span>
+            <button
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                isYearly 
+                  ? 'bg-blue-ribbon text-white' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setIsYearly(true)}
+            >
+              Yearly
+            </button>
+          </div>
         </div>
       </div>
 
