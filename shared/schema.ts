@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionPlan: varchar("subscription_plan"), // 'starter', 'business', 'enterprise'
   subscriptionStatus: varchar("subscription_status"), // 'active', 'canceled', 'past_due'
+  monthlyVideoCount: integer("monthly_video_count").default(0),
+  lastResetDate: timestamp("last_reset_date").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -111,4 +113,30 @@ export interface AnalyzeVideosResponse {
       negative: number;
     };
   };
+}
+
+// Plan limits configuration
+export const PLAN_LIMITS = {
+  starter: {
+    maxBatchSize: 5,
+    monthlyVideoLimit: 20
+  },
+  business: {
+    maxBatchSize: 10,
+    monthlyVideoLimit: 50
+  },
+  enterprise: {
+    maxBatchSize: 20,
+    monthlyVideoLimit: 100
+  }
+} as const;
+
+export type PlanType = keyof typeof PLAN_LIMITS;
+
+// Usage tracking types
+export interface UserUsage {
+  monthlyVideoCount: number;
+  lastResetDate: Date;
+  subscriptionPlan: PlanType | null;
+  subscriptionStatus: string | null;
 }

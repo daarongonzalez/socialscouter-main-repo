@@ -22,6 +22,11 @@ export interface IStorage {
   updateUserSubscription(stripeCustomerId: string, subscriptionStatus: string, subscriptionPlan?: string): Promise<User | null>;
   getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined>;
   
+  // Usage tracking operations
+  incrementUserVideoCount(userId: string, videoCount: number): Promise<User>;
+  resetMonthlyUsageIfNeeded(userId: string): Promise<User>;
+  getUserUsage(userId: string): Promise<{ monthlyVideoCount: number; lastResetDate: Date; subscriptionPlan: string | null; subscriptionStatus: string | null } | null>;
+  
   createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult>;
   getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]>;
   
@@ -93,6 +98,62 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.stripeCustomerId, stripeCustomerId));
     return user;
+  }
+
+  async incrementUserVideoCount(userId: string, videoCount: number): Promise<User> {
+    // First reset monthly usage if needed
+    await this.resetMonthlyUsageIfNeeded(userId);
+    
+    // Get current count and increment
+    const currentUser = await this.getUser(userId);
+    const currentCount = currentUser?.monthlyVideoCount || 0;
+    
+    const [user] = await db
+      .update(users)
+      .set({
+        monthlyVideoCount: currentCount + videoCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async resetMonthlyUsageIfNeeded(userId: string): Promise<User> {
+    const user = await this.getUser(userId);
+    if (!user) throw new Error('User not found');
+
+    const now = new Date();
+    const lastReset = user.lastResetDate || user.createdAt || now;
+    const daysSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24);
+
+    // Reset if it's been more than 30 days
+    if (daysSinceReset >= 30) {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          monthlyVideoCount: 0,
+          lastResetDate: now,
+          updatedAt: now,
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      return updatedUser;
+    }
+
+    return user;
+  }
+
+  async getUserUsage(userId: string): Promise<{ monthlyVideoCount: number; lastResetDate: Date; subscriptionPlan: string | null; subscriptionStatus: string | null } | null> {
+    const user = await this.getUser(userId);
+    if (!user) return null;
+
+    return {
+      monthlyVideoCount: user.monthlyVideoCount || 0,
+      lastResetDate: user.lastResetDate || user.createdAt || new Date(),
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionStatus: user.subscriptionStatus
+    };
   }
 
   async createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult> {
