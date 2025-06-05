@@ -21,7 +21,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: users1Icon
+        icon: users1Icon,
+        paymentUrl: 'https://buy.stripe.com/cNi9AM5vE4NN1JBfog0Ny00'
       },
       {
         name: 'Business',
@@ -30,7 +31,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: users2Icon
+        icon: users2Icon,
+        paymentUrl: 'https://buy.stripe.com/00w7sE3nwdkjgEvcc40Ny01'
       },
       {
         name: 'Enterprise',
@@ -39,7 +41,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: users3Icon
+        icon: users3Icon,
+        paymentUrl: 'https://buy.stripe.com/3cIcMY8HQ4NNcof0tm0Ny02'
       }
     ],
     yearly: [
@@ -50,7 +53,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: users1Icon
+        icon: users1Icon,
+        paymentUrl: 'https://buy.stripe.com/fZu5kwcY67ZZfArcc40Ny03'
       },
       {
         name: 'Business',
@@ -59,7 +63,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: users2Icon
+        icon: users2Icon,
+        paymentUrl: 'https://buy.stripe.com/7sY14ge2a943gEva3W0Ny04'
       },
       {
         name: 'Enterprise',
@@ -68,7 +73,8 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: users3Icon
+        icon: users3Icon,
+        paymentUrl: 'https://buy.stripe.com/cNi9AM0bk1BB3RJgsk0Ny05'
       }
     ]
   };
@@ -80,6 +86,26 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
       <h2 className="text-3xl font-bold text-center mb-8" style={{ color: 'hsl(var(--neutral-800))' }}>
         A Plan for Any Size Team
       </h2>
+      
+      {/* Save 20% Callout */}
+      <div className="flex justify-center mb-4">
+        <div className="relative">
+          <div 
+            className="px-3 py-1 rounded-full text-sm font-medium text-white"
+            style={{ backgroundColor: 'hsl(var(--tree-poppy-500))' }}
+          >
+            Save 20%
+          </div>
+          <div 
+            className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1"
+            style={{ color: 'hsl(var(--tree-poppy-500))' }}
+          >
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor">
+              <path d="M6 8L0 0h12L6 8z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
       
       {/* Monthly/Yearly Toggle */}
       <div className="flex justify-center mb-8">
@@ -148,7 +174,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
               {/* Sign Up Button */}
               <Button
                 className="w-full bg-blue-ribbon hover:opacity-90 text-white"
-                onClick={() => onPlanSelect(plan.name.toLowerCase(), isYearly)}
+                onClick={() => window.open(plan.paymentUrl, '_blank')}
               >
                 Sign Up
               </Button>
