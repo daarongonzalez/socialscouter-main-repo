@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import users1Icon from '@assets/Users-1.png';
+import users2Icon from '@assets/Users-2.png';
+import users3Icon from '@assets/Users-3.png';
 
 interface PricingTableProps {
   onPlanSelect: (plan: string, isYearly: boolean) => void;
@@ -18,7 +21,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: '👤'
+        icon: users1Icon
       },
       {
         name: 'Business',
@@ -27,7 +30,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: '👥'
+        icon: users2Icon
       },
       {
         name: 'Enterprise',
@@ -36,7 +39,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: '👨‍👩‍👧‍👦'
+        icon: users3Icon
       }
     ],
     yearly: [
@@ -47,7 +50,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: '👤'
+        icon: users1Icon
       },
       {
         name: 'Business',
@@ -56,7 +59,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: '👥'
+        icon: users2Icon
       },
       {
         name: 'Enterprise',
@@ -65,7 +68,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: '👨‍👩‍👧‍👦'
+        icon: users3Icon
       }
     ]
   };
@@ -117,10 +120,14 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
               {/* Icon */}
               <div className="flex justify-center mb-4">
                 <div 
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: 'hsl(var(--tree-poppy-100))' }}
                 >
-                  {plan.icon}
+                  <img 
+                    src={plan.icon} 
+                    alt={`${plan.name} plan icon`}
+                    className="w-8 h-8 object-contain"
+                  />
                 </div>
               </div>
 
