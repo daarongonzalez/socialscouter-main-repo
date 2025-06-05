@@ -58,7 +58,6 @@ export default function LoginPortal() {
           <CardContent className="p-8">
             <div className="flex flex-col items-center mb-6">
               <img src={iconNameSmall} alt="SocialScouter" className="w-12 h-12 mb-4" />
-              <span className="font-semibold mb-2" style={{ color: 'hsl(var(--neutral-800))' }}>SocialScouter</span>
               
               {isSignUp ? (
                 <>
