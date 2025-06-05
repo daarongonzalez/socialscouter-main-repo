@@ -119,16 +119,11 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
             <CardContent className="p-6">
               {/* Icon */}
               <div className="flex justify-center mb-4">
-                <div 
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'hsl(var(--tree-poppy-100))' }}
-                >
-                  <img 
-                    src={plan.icon} 
-                    alt={`${plan.name} plan icon`}
-                    className="w-8 h-8 object-contain"
-                  />
-                </div>
+                <img 
+                  src={plan.icon} 
+                  alt={`${plan.name} plan icon`}
+                  className="w-12 h-12 object-contain"
+                />
               </div>
 
               {/* Plan Name and Price */}
