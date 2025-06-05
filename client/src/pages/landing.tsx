@@ -51,11 +51,11 @@ export default function LoginPortal() {
         <div 
           className="absolute pointer-events-none"
           style={{
-            top: '20%',
-            left: '10%',
-            width: '300px',
-            height: '300px',
-            background: `radial-gradient(circle, hsl(var(--blue-ribbon-500) / 0.08) 0%, hsl(var(--blue-ribbon-500) / 0.04) 40%, transparent 70%)`,
+            top: '15%',
+            left: '5%',
+            width: '500px',
+            height: '500px',
+            background: `radial-gradient(circle, hsl(var(--blue-ribbon-500) / 0.15) 0%, hsl(var(--blue-ribbon-500) / 0.08) 40%, transparent 70%)`,
             borderRadius: '50%'
           }}
         ></div>
@@ -63,11 +63,11 @@ export default function LoginPortal() {
         <div 
           className="absolute pointer-events-none"
           style={{
-            bottom: '10%',
-            right: '10%',
-            width: '250px',
-            height: '250px',
-            background: `radial-gradient(circle, hsl(var(--tree-poppy-500) / 0.08) 0%, hsl(var(--tree-poppy-500) / 0.04) 40%, transparent 70%)`,
+            bottom: '5%',
+            right: '5%',
+            width: '450px',
+            height: '450px',
+            background: `radial-gradient(circle, hsl(var(--tree-poppy-500) / 0.15) 0%, hsl(var(--tree-poppy-500) / 0.08) 40%, transparent 70%)`,
             borderRadius: '50%'
           }}
         ></div>
