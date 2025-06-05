@@ -7,6 +7,7 @@ import { PlatformSelector } from "@/components/platform-selector";
 import { UrlInputList } from "@/components/url-input-list";
 import { AnalysisResults } from "@/components/analysis-results";
 import { SummaryStats } from "@/components/summary-stats";
+import { UsageDisplay } from "@/components/usage-display";
 import { analyzeVideos } from "@/lib/sentiment-api";
 import { useToast } from "@/hooks/use-toast";
 import type { AnalyzeVideosResponse } from "@shared/schema";
@@ -61,6 +62,7 @@ export default function Dashboard() {
       <main className="container mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1 space-y-6">
+            <UsageDisplay />
             <PlatformSelector
               contentType={contentType}
               onContentTypeChange={setContentType}
