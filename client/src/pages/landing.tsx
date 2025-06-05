@@ -42,13 +42,38 @@ export default function LoginPortal() {
         </div>
       </header>
       {/* Main Content */}
-      <div className="flex flex-col items-center justify-center px-4 py-16">
+      <div className="flex flex-col items-center justify-center px-4 py-16 relative">
         <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
           {isSignUp ? "We're Stoked You're Here!" : "You're Almost There!"}
         </h1>
 
+        {/* Background Gradients */}
+        <div 
+          className="absolute pointer-events-none"
+          style={{
+            top: '20%',
+            left: '10%',
+            width: '300px',
+            height: '300px',
+            background: `radial-gradient(circle, hsl(var(--blue-ribbon-500) / 0.08) 0%, hsl(var(--blue-ribbon-500) / 0.04) 40%, transparent 70%)`,
+            borderRadius: '50%'
+          }}
+        ></div>
+        
+        <div 
+          className="absolute pointer-events-none"
+          style={{
+            bottom: '10%',
+            right: '10%',
+            width: '250px',
+            height: '250px',
+            background: `radial-gradient(circle, hsl(var(--tree-poppy-500) / 0.08) 0%, hsl(var(--tree-poppy-500) / 0.04) 40%, transparent 70%)`,
+            borderRadius: '50%'
+          }}
+        ></div>
+
         {/* Login/Signup Form */}
-        <Card className="w-full max-w-md bg-card border shadow-lg" style={{ borderColor: 'hsl(var(--blue-ribbon-500))', borderWidth: '1px' }}>
+        <Card className="w-full max-w-md bg-card border shadow-lg relative z-10" style={{ borderColor: 'hsl(var(--blue-ribbon-500))', borderWidth: '1px' }}>
           <CardContent className="p-8">
             <div className="flex flex-col items-center mb-6">
               <img src={iconNameSmall} alt="SocialScouter" className="h-12 object-contain mb-4" />
