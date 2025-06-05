@@ -9,6 +9,7 @@ import { planLimitsService } from "./lib/plan-limits-service";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
+import { getCsrfToken } from "./lib/csrf-middleware";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
