@@ -344,7 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       subscriptionStatus = 'canceled';
     }
 
-    await storage.updateUserSubscription(customerId, subscriptionStatus, plan || undefined);
+    await storage.updateUserSubscription(customerId, subscriptionStatus, plan ?? undefined);
     console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus} (${plan})`);
   }
 
@@ -355,15 +355,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-    if (invoice.subscription) {
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId && typeof subscriptionId === 'string') {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       await handleSubscriptionUpdate(subscription);
       console.log(`Payment succeeded for subscription ${subscription.id}`);
     }
   }
 
   async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    if (invoice.subscription) {
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId) {
       const customerId = invoice.customer as string;
       await storage.updateUserSubscription(customerId, 'past_due');
       console.log(`Payment failed for customer ${customerId}, marked as past_due`);
