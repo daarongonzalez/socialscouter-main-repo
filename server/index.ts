@@ -3,6 +3,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Special handling for Stripe webhook - needs raw body
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
+// JSON parsing for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
