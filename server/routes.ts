@@ -194,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Record video usage after successful analysis
-      await planLimitsService.recordVideoUsage(userId, urls.length);
+      await planLimitsService.recordVideoUsage(userId, sanitizedUrls.length);
 
       const response: AnalyzeVideosResponse = {
         batchId: batchAnalysis.id,
@@ -226,10 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get batch analysis results - requires authentication and ownership verification
   app.get("/api/batch/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const batchId = parseInt(req.params.id);
-      if (isNaN(batchId)) {
-        return res.status(400).json({ error: "Invalid batch ID" });
-      }
+      const batchId = InputSanitizer.validateBatchId(req.params.id);
 
       const userId = req.user.claims.sub;
       const batchAnalysis = await storage.getBatchAnalysis(batchId);
