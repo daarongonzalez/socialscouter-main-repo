@@ -7,6 +7,8 @@ import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { body, validationResult } from "express-validator";
+import { InputSanitizer } from "./lib/input-sanitizer";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -72,8 +74,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { urls, contentType, includeTimestamps } = validationResult.data;
       const userId = req.user.claims.sub;
 
+      // Sanitize and validate URLs
+      const sanitizedUrls: string[] = [];
+      for (const url of urls) {
+        try {
+          const sanitizedUrl = InputSanitizer.sanitizeUrl(url);
+          sanitizedUrls.push(sanitizedUrl);
+        } catch (error) {
+          return res.status(400).json({
+            error: "Invalid URL",
+            message: `URL validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          });
+        }
+      }
+
       // Check user limits before processing
-      const limitCheck = await planLimitsService.checkUserLimits(userId, urls.length);
+      const limitCheck = await planLimitsService.checkUserLimits(userId, sanitizedUrls.length);
       if (!limitCheck.canProceed) {
         return res.status(403).json({
           error: "Usage limit exceeded",
@@ -87,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batchAnalysis = await storage.createBatchAnalysis({
         userId,
         contentType,
-        totalVideos: urls.length,
+        totalVideos: sanitizedUrls.length,
         totalWords: 0, // Will be updated
         avgConfidence: 0, // Will be updated  
         processingTime: 0, // Will be updated
@@ -103,7 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let totalNeutralScore = 0;
       let totalNegativeScore = 0;
 
-      for (const url of urls) {
+      for (const url of sanitizedUrls) {
         try {
           // Get transcript from video URL
           const transcript = await transcriptService.getTranscript(url, contentType);
