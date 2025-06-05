@@ -56,7 +56,9 @@ export default function LoginPortal() {
           </div>
           
           <div className="flex items-center gap-2">
-            <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
+            <a href="https://socialscouter.ai/" className="hover:opacity-80 transition-opacity">
+              <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
+            </a>
           </div>
           
           <Button 
