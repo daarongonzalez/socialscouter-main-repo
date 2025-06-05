@@ -124,7 +124,6 @@ export default function LoginPortal() {
                   </>
                 ) : (
                   <>
-                    <h2 className="text-xl font-semibold mb-1" style={{ color: 'hsl(var(--neutral-800))' }}>Welcome Back!</h2>
                     <p className="text-sm text-center" style={{ color: 'hsl(var(--neutral-500))' }}>Sign in to continue to your account</p>
                   </>
                 )}
