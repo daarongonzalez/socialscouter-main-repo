@@ -5,6 +5,7 @@ import { analyzeVideosSchema, type AnalyzeVideosRequest, type AnalyzeVideosRespo
 import { ZodError } from "zod";
 import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
+import { planLimitsService } from "./lib/plan-limits-service";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 
@@ -70,6 +71,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { urls, contentType, includeTimestamps } = validationResult.data;
       const userId = req.user.claims.sub;
+
+      // Check user limits before processing
+      const limitCheck = await planLimitsService.checkUserLimits(userId, urls.length);
+      if (!limitCheck.canProceed) {
+        return res.status(403).json({
+          error: "Usage limit exceeded",
+          message: limitCheck.errorMessage,
+          currentUsage: limitCheck.currentUsage,
+          planLimits: limitCheck.planLimits
+        });
+      }
 
       // Create batch analysis record first (with placeholder data)
       const batchAnalysis = await storage.createBatchAnalysis({
@@ -165,6 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgNegativeScore
       });
 
+      // Record video usage after successful analysis
+      await planLimitsService.recordVideoUsage(userId, urls.length);
+
       const response: AnalyzeVideosResponse = {
         batchId: batchAnalysis.id,
         results,
@@ -225,6 +240,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(batches);
     } catch (error) {
       console.error("Error fetching history:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get user plan information and usage
+  app.get("/api/user/plan", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const planInfo = await planLimitsService.getUserPlanInfo(userId);
+      
+      if (!planInfo) {
+        return res.status(404).json({ error: "User plan information not found" });
+      }
+
+      res.json(planInfo);
+    } catch (error) {
+      console.error("Error fetching user plan info:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
