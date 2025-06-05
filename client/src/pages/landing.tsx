@@ -69,7 +69,7 @@ export default function LoginPortal() {
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center px-4 py-16 relative">
         <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
-          {isSignUp ? "We're Stoked You're Here!" : "You're Almost There!"}
+          {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
         </h1>
 
         {/* Background Gradients */}
