@@ -7,7 +7,7 @@ import { csrfMiddleware } from "./lib/csrf-middleware";
 
 const app = express();
 
-// Security headers - relaxed for development
+// Security headers with production HTTPS enforcement
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
     directives: {
@@ -22,8 +22,24 @@ app.use(helmet({
       frameSrc: ["'none'"],
     },
   } : false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  hsts: process.env.NODE_ENV === 'production' ? {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  } : false
 }));
+
+// Force HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    const forwarded = req.headers['x-forwarded-proto'];
+    if (forwarded && forwarded !== 'https') {
+      return res.redirect(301, `https://${req.get('Host')}${req.url}`);
+    }
+    next();
+  });
+}
 
 // Rate limiting
 const limiter = rateLimit({

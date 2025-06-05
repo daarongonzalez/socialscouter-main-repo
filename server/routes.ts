@@ -58,6 +58,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // CSRF token endpoint
+  app.get("/api/csrf-token", (req: any, res) => {
+    const token = req.csrfToken ? req.csrfToken() : getCsrfToken();
+    res.json({ csrfToken: token });
+  });
+
   // Analyze videos endpoint - now requires authentication
   app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
     try {
