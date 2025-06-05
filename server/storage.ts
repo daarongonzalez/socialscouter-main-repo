@@ -19,6 +19,8 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
+  updateUserSubscription(stripeCustomerId: string, subscriptionStatus: string, subscriptionPlan?: string): Promise<User | null>;
+  getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined>;
   
   createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult>;
   getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]>;
@@ -63,6 +65,33 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(users.id, userId))
       .returning();
+    return user;
+  }
+
+  async updateUserSubscription(stripeCustomerId: string, subscriptionStatus: string, subscriptionPlan?: string): Promise<User | null> {
+    const updateData: any = {
+      subscriptionStatus,
+      updatedAt: new Date(),
+    };
+    
+    if (subscriptionPlan) {
+      updateData.subscriptionPlan = subscriptionPlan;
+    }
+
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.stripeCustomerId, stripeCustomerId))
+      .returning();
+    
+    return user || null;
+  }
+
+  async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.stripeCustomerId, stripeCustomerId));
     return user;
   }
 

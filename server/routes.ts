@@ -15,6 +15,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-04-30.basil",
 });
 
+// Helper function to extract plan from price ID
+function getPlanFromPriceId(priceId: string): string | null {
+  // Map Stripe price IDs to plan names
+  const priceToPlans: { [key: string]: string } = {
+    'price_starter_monthly': 'starter',
+    'price_starter_yearly': 'starter',
+    'price_business_monthly': 'business', 
+    'price_business_yearly': 'business',
+    'price_enterprise_monthly': 'enterprise',
+    'price_enterprise_yearly': 'enterprise'
+  };
+  
+  return priceToPlans[priceId] || null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -257,6 +272,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: error.message });
     }
   });
+
+  // Stripe webhook endpoint (must be before JSON body parsing middleware)
+  app.post('/api/stripe/webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event: Stripe.Event;
+
+    try {
+      // Verify webhook signature
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        console.error('Missing STRIPE_WEBHOOK_SECRET environment variable');
+        return res.status(400).send('Webhook secret not configured');
+      }
+
+      event = stripe.webhooks.constructEvent(req.body, sig as string, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    try {
+      switch (event.type) {
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+          await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+          break;
+        
+        case 'customer.subscription.deleted':
+          await handleSubscriptionCanceled(event.data.object as Stripe.Subscription);
+          break;
+        
+        case 'invoice.payment_succeeded':
+          await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+          break;
+        
+        case 'invoice.payment_failed':
+          await handlePaymentFailed(event.data.object as Stripe.Invoice);
+          break;
+        
+        default:
+          console.log(`Unhandled event type: ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error('Error processing webhook:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  });
+
+  // Webhook handler functions
+  async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
+    const status = subscription.status;
+    
+    // Determine plan from price ID
+    let plan = null;
+    if (subscription.items.data.length > 0) {
+      const priceId = subscription.items.data[0].price.id;
+      plan = getPlanFromPriceId(priceId);
+    }
+
+    // Map Stripe statuses to our internal statuses
+    let subscriptionStatus = 'inactive';
+    if (status === 'active' || status === 'trialing') {
+      subscriptionStatus = 'active';
+    } else if (status === 'past_due') {
+      subscriptionStatus = 'past_due';
+    } else if (status === 'canceled' || status === 'unpaid') {
+      subscriptionStatus = 'canceled';
+    }
+
+    await storage.updateUserSubscription(customerId, subscriptionStatus, plan || undefined);
+    console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus} (${plan})`);
+  }
+
+  async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
+    await storage.updateUserSubscription(customerId, 'canceled');
+    console.log(`Canceled subscription for customer ${customerId}`);
+  }
+
+  async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+    if (invoice.subscription) {
+      const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+      await handleSubscriptionUpdate(subscription);
+      console.log(`Payment succeeded for subscription ${subscription.id}`);
+    }
+  }
+
+  async function handlePaymentFailed(invoice: Stripe.Invoice) {
+    if (invoice.subscription) {
+      const customerId = invoice.customer as string;
+      await storage.updateUserSubscription(customerId, 'past_due');
+      console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+    }
+  }
 
   const httpServer = createServer(app);
   return httpServer;
