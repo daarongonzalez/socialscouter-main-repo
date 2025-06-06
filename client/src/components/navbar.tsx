@@ -30,7 +30,6 @@ export function Navbar() {
           <div className="flex items-center">
             <a href="https://socialscouter.ai/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
-              <span className="text-xl font-bold text-neutral-800">SocialScouter</span>
             </a>
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
@@ -47,8 +46,6 @@ export function Navbar() {
               <BarChart3 className="h-4 w-4 mr-2" />
               Ads Analyzer
             </Button>
-            
-
           </nav>
         </div>
       </div>
