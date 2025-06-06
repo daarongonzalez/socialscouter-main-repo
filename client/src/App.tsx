@@ -15,15 +15,11 @@ function Router() {
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={LoginPortal} />
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/history" component={HistoryPage} />
-          <Route path="/subscribe" component={Subscribe} />
-        </>
-      )}
+      {/* Temporarily bypass auth for development */}
+      <Route path="/login" component={LoginPortal} />
+      <Route path="/" component={Dashboard} />
+      <Route path="/history" component={HistoryPage} />
+      <Route path="/subscribe" component={Subscribe} />
       <Route component={NotFound} />
     </Switch>
   );
