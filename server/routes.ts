@@ -7,6 +7,7 @@ import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupDevAuth, devAuthBypass } from "./dev-auth";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
@@ -35,14 +36,21 @@ function getPlanFromPriceId(priceId: string): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Set up authentication - development or production
+  if (process.env.NODE_ENV === 'development') {
+    setupDevAuth(app);
+  } else {
+    await setupAuth(app);
+  }
 
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
+  // Create composite auth middleware that works in both environments
+  const authMiddleware = process.env.NODE_ENV === 'development' ? devAuthBypass : isAuthenticated;
+
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auth/user', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -65,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analyze videos endpoint - now requires authentication
-  app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
+  app.post("/api/analyze", authMiddleware, async (req: any, res) => {
     try {
       const startTime = Date.now();
       
@@ -231,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get batch analysis results - requires authentication and ownership verification
-  app.get("/api/batch/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/batch/:id", authMiddleware, async (req: any, res) => {
     try {
       const batchId = InputSanitizer.validateBatchId(req.params.id);
 
@@ -260,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user's batch analyses for history
-  app.get("/api/history", isAuthenticated, async (req: any, res) => {
+  app.get("/api/history", authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const batches = await storage.getUserBatchAnalyses(userId);
@@ -272,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user plan information and usage
-  app.get("/api/user/plan", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/plan", authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const planInfo = await planLimitsService.getUserPlanInfo(userId);
@@ -289,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe subscription routes
-  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+  app.post('/api/create-subscription', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
