@@ -12,12 +12,6 @@ if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
 }
 
-// Ensure app.socialscouter.ai is included in the domains
-const domains = process.env.REPLIT_DOMAINS.split(",").map(d => d.trim());
-if (!domains.includes("app.socialscouter.ai")) {
-  domains.push("app.socialscouter.ai");
-}
-
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -85,13 +79,26 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      console.log("Auth verify callback triggered");
+      const user = {};
+      updateUserSession(user, tokens);
+      const claims = tokens.claims();
+      if (!claims) {
+        throw new Error("No claims received from auth provider");
+      }
+      console.log("User claims:", { sub: claims.sub, email: claims.email });
+      await upsertUser(claims);
+      console.log("User upserted successfully");
+      verified(null, user);
+    } catch (error) {
+      console.error("Error in verify callback:", error);
+      verified(error, null);
+    }
   };
 
-  for (const domain of domains) {
+  for (const domain of process.env
+    .REPLIT_DOMAINS!.split(",")) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,
@@ -115,9 +122,22 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Auth error:", err);
+        return res.redirect("/api/login");
+      }
+      if (!user) {
+        console.error("No user returned from auth:", info);
+        return res.redirect("/api/login");
+      }
+      req.logIn(user, (err: any) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.redirect("/api/login");
+        }
+        return res.redirect("/");
+      });
     })(req, res, next);
   });
 
