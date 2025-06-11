@@ -109,7 +109,8 @@ export class SentimentService {
         ],
       });
 
-      const content = response.content[0]?.text || "";
+      const textBlock = response.content.find(block => block.type === 'text');
+      const content = textBlock ? (textBlock as any).text : "";
       
       try {
         const result = JSON.parse(content);
