@@ -5,6 +5,7 @@ import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
+import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
@@ -22,14 +23,24 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    ttl: sessionTtl,
+    tableName: "sessions",
+  });
+  
   return session({
     secret: process.env.SESSION_SECRET!,
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: true,
+      maxAge: sessionTtl,
     },
   });
 }
@@ -69,7 +80,7 @@ export async function setupAuth(app: Express) {
       if (!claims) {
         throw new Error('No claims received from OAuth provider');
       }
-      console.log('User claims:', { sub: claims.sub, email: claims.email });
+      console.log('User claims:', { sub: claims?.sub, email: claims?.email });
       
       const user = {};
       updateUserSession(user, tokens);
@@ -84,34 +95,31 @@ export async function setupAuth(app: Express) {
   };
 
   const domains = process.env.REPLIT_DOMAINS!.split(",");
-  // Add localhost for development
-  const allDomains = [...domains, "127.0.0.1", "localhost"];
-  console.log('Registering Replit Auth strategies for domains:', allDomains);
+  console.log('Registering Replit Auth strategies for domains:', domains);
   
-  for (const domain of allDomains) {
+  for (const domain of domains) {
     const strategyName = `replitauth:${domain}`;
-    const protocol = domain.includes("127.0.0.1") || domain.includes("localhost") ? "http" : "https";
-    const port = domain.includes("127.0.0.1") || domain.includes("localhost") ? ":5000" : "";
-    
     const strategy = new Strategy(
       {
         name: strategyName,
         config,
         scope: "openid email profile offline_access",
-        callbackURL: `${protocol}://${domain}${port}/api/callback`,
+        callbackURL: `https://${domain}/api/callback`,
       },
       verify,
     );
     passport.use(strategy);
-    console.log(`Registered strategy: ${strategyName} with callback: ${protocol}://${domain}${port}/api/callback`);
+    console.log(`Registered strategy: ${strategyName} with callback: https://${domain}/api/callback`);
   }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
-    const strategyName = `replitauth:${req.hostname}`;
-    console.log(`Login attempt for hostname: ${req.hostname}, strategy: ${strategyName}`);
+    // Always use the primary Replit domain for authentication
+    const primaryDomain = domains[0];
+    const strategyName = `replitauth:${primaryDomain}`;
+    console.log(`Login attempt for hostname: ${req.hostname}, using strategy: ${strategyName}`);
     console.log(`Available domains: ${process.env.REPLIT_DOMAINS}`);
     
     try {
@@ -127,7 +135,10 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/callback", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
     console.log('Callback endpoint hit for hostname:', req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    // Always use the primary Replit domain for callback authentication
+    const primaryDomain = domains[0];
+    const strategyName = `replitauth:${primaryDomain}`;
+    passport.authenticate(strategyName, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
