@@ -125,6 +125,9 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
+      // Restrict to email and Google authentication only
+      login_hint: "email,google",
+      ui_locales: "en",
     })(req, res, next);
   });
 

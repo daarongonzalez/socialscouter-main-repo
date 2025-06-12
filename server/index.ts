@@ -7,6 +7,9 @@ import { csrfMiddleware } from "./lib/csrf-middleware";
 
 const app = express();
 
+// Set trust proxy before configuring middleware
+app.set("trust proxy", 1);
+
 // Security headers with production HTTPS enforcement
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {

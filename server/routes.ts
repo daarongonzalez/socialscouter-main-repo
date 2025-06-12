@@ -7,7 +7,6 @@ import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { setupDevAuth, devAuthBypass } from "./dev-auth";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
@@ -36,18 +35,14 @@ function getPlanFromPriceId(priceId: string): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication - development or production
-  if (process.env.NODE_ENV === 'development') {
-    setupDevAuth(app);
-  } else {
-    await setupAuth(app);
-  }
+  // Set up authentication - production only
+  await setupAuth(app);
 
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Create composite auth middleware that works in both environments
-  const authMiddleware = process.env.NODE_ENV === 'development' ? devAuthBypass : isAuthenticated;
+  // Use production authentication middleware
+  const authMiddleware = isAuthenticated;
 
   // Auth routes
   app.get('/api/auth/user', authMiddleware, async (req: any, res) => {

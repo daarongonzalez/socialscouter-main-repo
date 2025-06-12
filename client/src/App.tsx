@@ -25,11 +25,15 @@ function Router() {
   }
 
   if (!isAuthenticated) {
+    // Redirect directly to Replit Auth instead of showing custom login page
+    window.location.href = "/api/login";
     return (
-      <Switch>
-        <Route path="/login" component={LoginPortal} />
-        <Route component={LoginPortal} />
-      </Switch>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
     );
   }
 
