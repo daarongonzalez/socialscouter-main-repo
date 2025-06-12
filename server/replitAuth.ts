@@ -5,10 +5,7 @@ import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
-import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
-import { pool } from "./db";
-import MemoryStore from "memorystore";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -25,23 +22,14 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  
-  // Use memory store for development to avoid session connection issues
-  const MemStore = MemoryStore(session);
-  const sessionStore = new MemStore({
-    checkPeriod: 86400000, // prune expired entries every 24h
-  });
-  
   return session({
     secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       secure: false,
-      maxAge: sessionTtl,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
   });
 }
@@ -107,10 +95,15 @@ export async function setupAuth(app: Express) {
     console.log(`Login attempt for hostname: ${req.hostname}, strategy: ${strategyName}`);
     console.log(`Available domains: ${process.env.REPLIT_DOMAINS}`);
     
-    passport.authenticate(strategyName, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    try {
+      passport.authenticate(strategyName, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      res.status(500).json({ error: 'Authentication failed', details: error?.message || String(error) });
+    }
   });
 
   app.get("/api/callback", (req, res, next) => {
