@@ -208,7 +208,7 @@ export async function setupAuth(app: Express) {
         }
         
         console.log('User successfully authenticated and logged in');
-        return res.redirect('/');
+        return res.redirect('/dashboard');
       });
     })(req, res, next);
   });
