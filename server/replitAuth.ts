@@ -63,10 +63,24 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      console.log('OAuth verify callback triggered');
+      const claims = tokens.claims();
+      if (!claims) {
+        throw new Error('No claims received from OAuth provider');
+      }
+      console.log('User claims:', { sub: claims.sub, email: claims.email });
+      
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(claims);
+      
+      console.log('User successfully verified and upserted');
+      verified(null, user);
+    } catch (error) {
+      console.error('Error in verify callback:', error);
+      verified(error);
+    }
   };
 
   const domains = process.env.REPLIT_DOMAINS!.split(",");
@@ -112,6 +126,7 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
+    console.log('Callback endpoint hit for hostname:', req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
