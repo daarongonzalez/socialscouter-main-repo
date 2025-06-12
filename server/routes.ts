@@ -6,7 +6,7 @@ import { ZodError } from "zod";
 import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
@@ -35,25 +35,15 @@ function getPlanFromPriceId(priceId: string): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication - production only
-  await setupAuth(app);
-
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Use production authentication middleware
-  const authMiddleware = isAuthenticated;
+  // Temporary: No authentication middleware (will be reimplemented)
+  const authMiddleware = (req: any, res: any, next: any) => next();
 
-  // Auth routes
+  // Auth routes (temporarily disabled - will be reimplemented)
   app.get('/api/auth/user', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
+    res.status(401).json({ message: "Authentication not configured" });
   });
 
   // Health check endpoint
@@ -82,7 +72,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { urls, contentType, includeTimestamps } = validationResult.data;
-      const userId = req.user.claims.sub;
+      // Temporarily disabled - authentication required
+      return res.status(401).json({ error: "Authentication required" });
 
       // Sanitize and validate URLs
       const sanitizedUrls: string[] = [];
@@ -233,106 +224,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get batch analysis results - requires authentication and ownership verification
+  // Get batch analysis results - temporarily disabled
   app.get("/api/batch/:id", authMiddleware, async (req: any, res) => {
-    try {
-      const batchId = InputSanitizer.validateBatchId(req.params.id);
-
-      const userId = req.user.claims.sub;
-      const batchAnalysis = await storage.getBatchAnalysis(batchId);
-      
-      if (!batchAnalysis) {
-        return res.status(404).json({ error: "Batch analysis not found" });
-      }
-
-      // Verify ownership - user can only access their own batch analyses
-      if (batchAnalysis.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const results = await storage.getAnalysisResultsByBatchId(batchId);
-      
-      res.json({
-        batch: batchAnalysis,
-        results
-      });
-    } catch (error) {
-      console.error("Error fetching batch analysis:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.status(401).json({ error: "Authentication required" });
   });
 
-  // Get user's batch analyses for history
+  // Get user's batch analyses for history - temporarily disabled
   app.get("/api/history", authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const batches = await storage.getUserBatchAnalyses(userId);
-      res.json(batches);
-    } catch (error) {
-      console.error("Error fetching history:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.status(401).json({ error: "Authentication required" });
   });
 
-  // Get user plan information and usage
+  // Get user plan information and usage - temporarily disabled
   app.get("/api/user/plan", authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const planInfo = await planLimitsService.getUserPlanInfo(userId);
-      
-      if (!planInfo) {
-        return res.status(404).json({ error: "User plan information not found" });
-      }
-
-      res.json(planInfo);
-    } catch (error) {
-      console.error("Error fetching user plan info:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.status(401).json({ error: "Authentication required" });
   });
 
-  // Stripe subscription routes
+  // Stripe subscription routes - temporarily disabled
   app.post('/api/create-subscription', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      const { priceId, planName } = req.body;
-
-      if (!user?.email) {
-        return res.status(400).json({ error: 'User email is required' });
-      }
-
-      let customerId = user.stripeCustomerId;
-
-      // Create customer if doesn't exist
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        });
-        customerId = customer.id;
-        await storage.updateUserStripeInfo(userId, customerId, '');
-      }
-
-      // Create subscription
-      const subscription = await stripe.subscriptions.create({
-        customer: customerId,
-        items: [{ price: priceId }],
-        payment_behavior: 'default_incomplete',
-        expand: ['latest_invoice.payment_intent'],
-      });
-
-      // Update user with subscription info
-      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
-
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
-      });
-    } catch (error: any) {
-      console.error('Subscription creation error:', error);
-      res.status(400).json({ error: error.message });
-    }
+    res.status(401).json({ error: "Authentication required" });
   });
 
   // Stripe webhook endpoint (must be before JSON body parsing middleware)
