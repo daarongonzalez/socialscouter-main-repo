@@ -9,6 +9,7 @@ import { planLimitsService } from "./lib/plan-limits-service";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -37,12 +38,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Temporary: No authentication middleware (will be reimplemented)
-  const authMiddleware = (req: any, res: any, next: any) => next();
+  // Auth middleware
+  await setupAuth(app);
 
-  // Auth routes (temporarily disabled - will be reimplemented)
-  app.get('/api/auth/user', authMiddleware, async (req: any, res) => {
-    res.status(401).json({ message: "Authentication not configured" });
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
   });
 
   // Health check endpoint
@@ -56,29 +64,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint - temporarily disabled
-  app.post("/api/analyze", authMiddleware, async (req: any, res) => {
-    res.status(401).json({ error: "Authentication required" });
+  // Analyze videos endpoint
+  app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Validate input
+      const validationResults = analyzeVideosSchema.safeParse(req.body);
+      if (!validationResults.success) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: validationResults.error.errors 
+        });
+      }
+
+      const { urls, contentType, includeTimestamps } = validationResults.data;
+
+      // Check usage limits
+      const limitCheck = await planLimitsService.checkUserLimits(userId, urls.length);
+      if (!limitCheck.canProceed) {
+        return res.status(403).json({
+          error: limitCheck.errorMessage,
+          currentUsage: limitCheck.currentUsage,
+          planLimits: limitCheck.planLimits
+        });
+      }
+
+      // Sanitize URLs
+      const sanitizedUrls = urls.map(url => InputSanitizer.sanitizeUrl(url));
+
+      // Create batch analysis record
+      const batchData = {
+        userId,
+        contentType,
+        totalVideos: sanitizedUrls.length,
+        totalWords: 0,
+        avgConfidence: 0,
+        processingTime: 0,
+        sentimentCounts: JSON.stringify({ POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 })
+      };
+
+      const batch = await storage.createBatchAnalysis(batchData);
+      const startTime = Date.now();
+      
+      // Process each URL
+      const results: any[] = [];
+      let totalWords = 0;
+      let totalConfidence = 0;
+      const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+
+      for (const url of sanitizedUrls) {
+        try {
+          // Get transcript
+          const transcript = await transcriptService.getTranscript(url, contentType);
+          if (!transcript) {
+            console.warn(`Failed to get transcript for ${url}`);
+            continue;
+          }
+
+          // Analyze sentiment
+          const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+          const wordCount = transcript.split(/\s+/).length;
+          
+          // Store result
+          const analysisResult = await storage.createAnalysisResult({
+            url,
+            platform: contentType,
+            sentiment: sentimentResult.sentiment,
+            confidence: sentimentResult.confidence,
+            transcript: InputSanitizer.sanitizeText(transcript),
+            wordCount,
+            sentimentScores: JSON.stringify(sentimentResult.scores || {}),
+            batchId: batch.id
+          });
+
+          results.push(analysisResult);
+          totalWords += wordCount;
+          totalConfidence += sentimentResult.confidence;
+          sentimentCounts[sentimentResult.sentiment.toUpperCase() as keyof typeof sentimentCounts]++;
+
+        } catch (error) {
+          console.error(`Error processing URL ${url}:`, error);
+        }
+      }
+
+      const processingTime = (Date.now() - startTime) / 1000;
+      const avgConfidence = results.length > 0 ? totalConfidence / results.length : 0;
+
+      // Calculate sentiment percentages
+      const totalResults = results.length;
+      const sentimentScores = {
+        positive: totalResults > 0 ? (sentimentCounts.POSITIVE / totalResults) * 100 : 0,
+        neutral: totalResults > 0 ? (sentimentCounts.NEUTRAL / totalResults) * 100 : 0,
+        negative: totalResults > 0 ? (sentimentCounts.NEGATIVE / totalResults) * 100 : 0
+      };
+
+      // Record usage
+      await planLimitsService.recordVideoUsage(userId, results.length);
+
+      const response: AnalyzeVideosResponse = {
+        batchId: batch.id,
+        results,
+        summary: {
+          totalVideos: results.length,
+          totalWords,
+          avgConfidence,
+          processingTime,
+          sentimentCounts,
+          sentimentScores
+        }
+      };
+
+      res.json(response);
+
+    } catch (error) {
+      console.error('Error in analyze endpoint:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
-  // Get batch analysis results - temporarily disabled
-  app.get("/api/batch/:id", authMiddleware, async (req: any, res) => {
-    res.status(401).json({ error: "Authentication required" });
+  // Get batch analysis results
+  app.get("/api/batch/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const batchId = InputSanitizer.validateBatchId(req.params.id);
+      
+      const batch = await storage.getBatchAnalysis(batchId);
+      if (!batch) {
+        return res.status(404).json({ error: "Batch not found" });
+      }
+      
+      // Verify ownership
+      if (batch.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const results = await storage.getAnalysisResultsByBatchId(batchId);
+      res.json({ batch, results });
+    } catch (error) {
+      console.error('Error fetching batch:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
-  // Get user's batch analyses for history - temporarily disabled
-  app.get("/api/history", authMiddleware, async (req: any, res) => {
-    res.status(401).json({ error: "Authentication required" });
+  // Get user's batch analyses for history
+  app.get("/api/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const batches = await storage.getUserBatchAnalyses(userId);
+      res.json(batches);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
-  // Get user plan information and usage - temporarily disabled
-  app.get("/api/user/plan", authMiddleware, async (req: any, res) => {
-    res.status(401).json({ error: "Authentication required" });
+  // Get user plan information and usage
+  app.get("/api/user/plan", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const planInfo = await planLimitsService.getUserPlanInfo(userId);
+      res.json(planInfo);
+    } catch (error) {
+      console.error('Error fetching plan info:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
-  // Stripe subscription routes - temporarily disabled
-  app.post('/api/create-subscription', authMiddleware, async (req: any, res) => {
-    res.status(401).json({ error: "Authentication required" });
+  // Stripe subscription routes
+  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { priceId } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ error: 'Price ID is required' });
+      }
+
+      // Get or create Stripe customer
+      let user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, '');
+      }
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+      });
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      res.status(500).json({ error: 'Failed to create subscription' });
+    }
   });
 
   // Stripe webhook endpoint (must be before JSON body parsing middleware)
@@ -130,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       planType = getPlanFromPriceId(priceId);
     }
     
-    await storage.updateUserSubscription(customerId, status, planType);
+    await storage.updateUserSubscription(customerId, status, planType || undefined);
     console.log(`Subscription updated for customer ${customerId}: ${status}, plan: ${planType}`);
   }
 
