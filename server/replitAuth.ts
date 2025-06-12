@@ -122,13 +122,9 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/login", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-      // Restrict to email and Google authentication only
-      login_hint: "email,google",
-      ui_locales: "en",
-    })(req, res, next);
+    // Use the first domain from REPLIT_DOMAINS for authentication
+    const domain = process.env.REPLIT_DOMAINS!.split(",")[0];
+    passport.authenticate(`replitauth:${domain}`)(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
