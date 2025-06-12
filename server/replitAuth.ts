@@ -110,6 +110,7 @@ export async function setupAuth(app: Express) {
   const allDomains = [...domains, "app.socialscouter.ai"];
   console.log('Registering Replit Auth strategies for domains:', allDomains);
   
+  // Register all strategies synchronously
   for (const domain of allDomains) {
     const strategyName = `replitauth:${domain}`;
     const strategy = new Strategy(
@@ -128,12 +129,23 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
+  // Store domains for use in routes
+  (app as any).replitDomains = allDomains;
+
   app.get("/api/login", (req, res, next) => {
-    // Use the correct domain strategy based on hostname
-    const hostname = req.hostname;
+    // Map hostname to appropriate strategy
+    let hostname = req.hostname;
+    
+    // For development domains, use the primary Replit domain
+    if (hostname === '127.0.0.1' || hostname === 'localhost') {
+      hostname = domains[0]; // Use primary Replit domain
+    }
+    
     const strategyName = `replitauth:${hostname}`;
-    console.log(`Login attempt for hostname: ${hostname}, using strategy: ${strategyName}`);
+    console.log(`Login attempt for hostname: ${req.hostname}, mapped to strategy: ${strategyName}`);
     console.log(`Available domains: ${allDomains.join(', ')}`);
+    
+
     
     try {
       passport.authenticate(strategyName, {
@@ -147,21 +159,45 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log('=== OAuth Callback Debug Info ===');
     console.log('Callback endpoint hit for hostname:', req.hostname);
     console.log('Query parameters:', req.query);
+    console.log('Session ID:', req.sessionID);
+    console.log('User in session:', req.user);
     
-    // Use the correct domain strategy based on hostname
-    const hostname = req.hostname;
+    // Map hostname to appropriate strategy (same logic as login)
+    let hostname = req.hostname;
+    
+    // For development domains, use the primary Replit domain
+    if (hostname === '127.0.0.1' || hostname === 'localhost') {
+      hostname = domains[0]; // Use primary Replit domain
+    }
+    
     const strategyName = `replitauth:${hostname}`;
+    console.log(`Callback for hostname: ${req.hostname}, mapped to strategy: ${strategyName}`);
+    
+    // If no code parameter, something went wrong with OAuth
+    if (!req.query.code) {
+      console.error('No authorization code received in callback');
+      return res.status(400).json({ 
+        error: 'OAuth callback missing authorization code',
+        query: req.query 
+      });
+    }
     
     passport.authenticate(strategyName, (err: any, user: any, info: any) => {
+      console.log('=== Passport Authenticate Result ===');
+      console.log('Error:', err);
+      console.log('User:', user);
+      console.log('Info:', info);
+      
       if (err) {
         console.error('OAuth callback error:', err);
         return res.status(500).json({ error: 'Authentication failed', details: err.message });
       }
       
       if (!user) {
-        console.log('No user returned from OAuth, info:', info);
+        console.log('No user returned from OAuth, redirecting to login');
         return res.redirect('/api/login');
       }
       
@@ -185,6 +221,20 @@ export async function setupAuth(app: Express) {
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );
+    });
+  });
+
+  // Test endpoint to verify OAuth configuration
+  app.get("/api/auth/test", (req, res) => {
+    res.json({
+      replId: process.env.REPL_ID,
+      domains: allDomains,
+      strategies: Object.keys((passport as any)._strategies || {}),
+      session: {
+        id: req.sessionID,
+        user: req.user,
+        isAuthenticated: req.isAuthenticated()
+      }
     });
   });
 }
