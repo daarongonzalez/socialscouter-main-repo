@@ -34,7 +34,10 @@ function Router() {
           <Route component={NotFound} />
         </>
       ) : (
-        <Route path="*" component={LoginPortal} />
+        <>
+          <Route path="/subscribe" component={Subscribe} />
+          <Route path="*" component={LoginPortal} />
+        </>
       )}
     </Switch>
   );

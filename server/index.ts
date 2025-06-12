@@ -4,6 +4,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { csrfMiddleware } from "./lib/csrf-middleware";
+import { getSession } from "./replitAuth";
+import passport from "passport";
 
 const app = express();
 
@@ -80,6 +82,11 @@ app.use('/api/analyze', analysisLimiter);
 // JSON parsing for all other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Session and Passport setup (must come before CSRF)
+app.use(getSession());
+app.use(passport.initialize());
+app.use(passport.session());
 
 // CSRF protection for all routes except webhooks
 app.use((req, res, next) => {
