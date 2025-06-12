@@ -83,41 +83,29 @@ app.use('/api/analyze', analysisLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Session and Passport setup (minimal for auth routes only)
-app.use('/api/login', getSession());
-app.use('/api/login', passport.initialize());
-app.use('/api/callback', getSession());
-app.use('/api/callback', passport.initialize());
-app.use('/api/logout', getSession());
-app.use('/api/logout', passport.initialize());
-
-// Global session for other routes (with error handling)
+// Skip all problematic middleware for auth routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/login') || req.path.startsWith('/api/callback') || req.path.startsWith('/api/logout')) {
     return next();
   }
+  
+  // Apply session and passport for non-auth routes
   try {
     getSession()(req, res, () => {
       passport.initialize()(req, res, () => {
-        passport.session()(req, res, next);
+        passport.session()(req, res, () => {
+          // Apply CSRF protection
+          if (req.path.startsWith('/api/stripe/webhook') || req.path === '/api/health') {
+            return next();
+          }
+          csrfMiddleware(req, res, next);
+        });
       });
     });
   } catch (error) {
-    console.error('Session middleware error:', error);
+    console.error('Middleware error:', error);
     next();
   }
-});
-
-// CSRF protection for non-auth routes
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/stripe/webhook') || 
-      req.path === '/api/health' ||
-      req.path.startsWith('/api/login') || 
-      req.path.startsWith('/api/callback') || 
-      req.path.startsWith('/api/logout')) {
-    return next();
-  }
-  csrfMiddleware(req, res, next);
 });
 
 app.use((req, res, next) => {

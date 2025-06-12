@@ -70,27 +70,32 @@ export async function setupAuth(app: Express) {
   };
 
   const domains = process.env.REPLIT_DOMAINS!.split(",");
-  console.log('Registering Replit Auth strategies for domains:', domains);
+  // Add localhost for development
+  const allDomains = [...domains, "127.0.0.1", "localhost"];
+  console.log('Registering Replit Auth strategies for domains:', allDomains);
   
-  for (const domain of domains) {
+  for (const domain of allDomains) {
     const strategyName = `replitauth:${domain}`;
+    const protocol = domain.includes("127.0.0.1") || domain.includes("localhost") ? "http" : "https";
+    const port = domain.includes("127.0.0.1") || domain.includes("localhost") ? ":5000" : "";
+    
     const strategy = new Strategy(
       {
         name: strategyName,
         config,
         scope: "openid email profile offline_access",
-        callbackURL: `https://${domain}/api/callback`,
+        callbackURL: `${protocol}://${domain}${port}/api/callback`,
       },
       verify,
     );
     passport.use(strategy);
-    console.log(`Registered strategy: ${strategyName}`);
+    console.log(`Registered strategy: ${strategyName} with callback: ${protocol}://${domain}${port}/api/callback`);
   }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", (req, res, next) => {
+  app.get("/api/login", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
     const strategyName = `replitauth:${req.hostname}`;
     console.log(`Login attempt for hostname: ${req.hostname}, strategy: ${strategyName}`);
     console.log(`Available domains: ${process.env.REPLIT_DOMAINS}`);
@@ -106,14 +111,14 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.get("/api/callback", (req, res, next) => {
+  app.get("/api/callback", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
   });
 
-  app.get("/api/logout", (req, res) => {
+  app.get("/api/logout", getSession(), passport.initialize(), passport.session(), (req, res) => {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {
