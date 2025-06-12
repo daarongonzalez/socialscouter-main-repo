@@ -24,23 +24,33 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  
+  // Use memory store for development, PostgreSQL for production
+  let store;
+  if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
+    try {
+      const pgStore = connectPg(session);
+      store = new pgStore({
+        conString: process.env.DATABASE_URL,
+        createTableIfMissing: false,
+        ttl: sessionTtl,
+        tableName: "sessions",
+      });
+    } catch (error) {
+      console.warn('Failed to connect to PostgreSQL session store, using memory store:', error);
+      store = undefined; // Use default memory store
+    }
+  }
   
   return session({
     secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
+    store: store,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: sessionTtl,
     },
   });
@@ -96,9 +106,11 @@ export async function setupAuth(app: Express) {
   };
 
   const domains = process.env.REPLIT_DOMAINS!.split(",");
-  console.log('Registering Replit Auth strategies for domains:', domains);
+  // Add your production domain for external routing
+  const allDomains = [...domains, "app.socialscouter.ai"];
+  console.log('Registering Replit Auth strategies for domains:', allDomains);
   
-  for (const domain of domains) {
+  for (const domain of allDomains) {
     const strategyName = `replitauth:${domain}`;
     const strategy = new Strategy(
       {
@@ -116,12 +128,12 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
-    // Always use the primary Replit domain for authentication
-    const primaryDomain = domains[0];
-    const strategyName = `replitauth:${primaryDomain}`;
-    console.log(`Login attempt for hostname: ${req.hostname}, using strategy: ${strategyName}`);
-    console.log(`Available domains: ${process.env.REPLIT_DOMAINS}`);
+  app.get("/api/login", (req, res, next) => {
+    // Use the correct domain strategy based on hostname
+    const hostname = req.hostname;
+    const strategyName = `replitauth:${hostname}`;
+    console.log(`Login attempt for hostname: ${hostname}, using strategy: ${strategyName}`);
+    console.log(`Available domains: ${allDomains.join(', ')}`);
     
     try {
       passport.authenticate(strategyName, {
@@ -134,18 +146,38 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.get("/api/callback", getSession(), passport.initialize(), passport.session(), (req, res, next) => {
+  app.get("/api/callback", (req, res, next) => {
     console.log('Callback endpoint hit for hostname:', req.hostname);
-    // Always use the primary Replit domain for callback authentication
-    const primaryDomain = domains[0];
-    const strategyName = `replitauth:${primaryDomain}`;
-    passport.authenticate(strategyName, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    console.log('Query parameters:', req.query);
+    
+    // Use the correct domain strategy based on hostname
+    const hostname = req.hostname;
+    const strategyName = `replitauth:${hostname}`;
+    
+    passport.authenticate(strategyName, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error('OAuth callback error:', err);
+        return res.status(500).json({ error: 'Authentication failed', details: err.message });
+      }
+      
+      if (!user) {
+        console.log('No user returned from OAuth, info:', info);
+        return res.redirect('/api/login');
+      }
+      
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('Login error:', loginErr);
+          return res.status(500).json({ error: 'Login failed', details: loginErr.message });
+        }
+        
+        console.log('User successfully authenticated and logged in');
+        return res.redirect('/');
+      });
     })(req, res, next);
   });
 
-  app.get("/api/logout", getSession(), passport.initialize(), passport.session(), (req, res) => {
+  app.get("/api/logout", (req, res) => {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {

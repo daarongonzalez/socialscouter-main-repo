@@ -83,29 +83,25 @@ app.use('/api/analyze', analysisLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Skip all problematic middleware for auth routes
+// Apply session and passport middleware globally
+try {
+  app.use(getSession());
+  app.use(passport.initialize());
+  app.use(passport.session());
+} catch (error) {
+  console.error('Session middleware error:', error);
+}
+
+// Apply CSRF protection (skip for webhooks, health, and auth routes)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/login') || req.path.startsWith('/api/callback') || req.path.startsWith('/api/logout')) {
+  if (req.path.startsWith('/api/stripe/webhook') || 
+      req.path === '/api/health' ||
+      req.path.startsWith('/api/login') || 
+      req.path.startsWith('/api/callback') || 
+      req.path.startsWith('/api/logout')) {
     return next();
   }
-  
-  // Apply session and passport for non-auth routes
-  try {
-    getSession()(req, res, () => {
-      passport.initialize()(req, res, () => {
-        passport.session()(req, res, () => {
-          // Apply CSRF protection
-          if (req.path.startsWith('/api/stripe/webhook') || req.path === '/api/health') {
-            return next();
-          }
-          csrfMiddleware(req, res, next);
-        });
-      });
-    });
-  } catch (error) {
-    console.error('Middleware error:', error);
-    next();
-  }
+  csrfMiddleware(req, res, next);
 });
 
 app.use((req, res, next) => {
