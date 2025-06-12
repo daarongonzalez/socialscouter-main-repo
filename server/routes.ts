@@ -38,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Auth middleware
+  // Setup Replit Auth strategies (session/passport already initialized in index.ts)
   await setupAuth(app);
 
   // Auth routes

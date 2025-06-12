@@ -7,6 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { pool } from "./db";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -25,12 +26,14 @@ const getOidcConfig = memoize(
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
+  
+  // Use pool connection instead of connection string
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
+    pool: require('./db').pool,
     tableName: "sessions",
+    createTableIfMissing: false,
   });
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -67,11 +70,6 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(getSession());
-  app.use(passport.initialize());
-  app.use(passport.session());
-
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
