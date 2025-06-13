@@ -55,22 +55,32 @@ function updateUserSession(
   user: any,
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
 ) {
-  user.claims = tokens.claims();
+  const claims = tokens.claims();
+  if (!claims || !claims.sub) {
+    throw new Error("Invalid token claims");
+  }
+  
+  user.claims = claims;
   user.access_token = tokens.access_token;
   user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
+  user.expires_at = claims.exp;
 }
 
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
+  try {
+    await storage.upsertUser({
+      id: claims["sub"],
+      email: claims["email"],
+      firstName: claims["first_name"],
+      lastName: claims["last_name"],
+      profileImageUrl: claims["profile_image_url"],
+    });
+  } catch (error) {
+    console.error("Error upserting user:", error);
+    throw error;
+  }
 }
 
 export async function setupAuth(app: Express) {
@@ -85,10 +95,15 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(tokens.claims());
+      verified(null, user);
+    } catch (error) {
+      console.error("Authentication verification failed:", error);
+      verified(error);
+    }
   };
 
   for (const domain of domains) {
@@ -115,20 +130,39 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log(`Authentication callback for domain: ${req.hostname}`);
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
-    })(req, res, next);
+    })(req, res, (err) => {
+      if (err) {
+        console.error("Authentication callback error:", err);
+        return res.redirect("/api/login");
+      }
+      next(err);
+    });
   });
 
   app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+    req.logout((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) {
+          console.error("Session destruction error:", sessionErr);
+        }
+        
+        res.redirect(
+          client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          }).href
+        );
+      });
     });
   });
 }
@@ -136,28 +170,41 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
+  // Check if user has required authentication data
+  if (!user.claims || !user.claims.sub) {
+    console.error("User missing claims or sub:", user);
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // If no expiration time, allow (for backward compatibility)
+  if (!user.expires_at) {
     return next();
   }
 
+  const now = Math.floor(Date.now() / 1000);
+  if (now < user.expires_at) {
+    return next();
+  }
+
+  // Token expired, try to refresh
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+    console.log("No refresh token available for expired session");
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
+    console.log("Refreshing expired token");
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
     return next();
   } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+    console.error("Token refresh failed:", error);
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
