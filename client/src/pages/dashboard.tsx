@@ -29,9 +29,27 @@ export default function Dashboard() {
     },
     onError: (error: any) => {
       console.error("Analysis error:", error);
+      
+      // Parse error message if it's a JSON string
+      let errorData;
+      try {
+        if (typeof error.message === 'string' && error.message.includes('{')) {
+          const jsonPart = error.message.substring(error.message.indexOf('{'));
+          errorData = JSON.parse(jsonPart);
+        }
+      } catch (e) {
+        // Fallback to original error message
+      }
+      
+      const title = errorData?.error === "No transcripts available" 
+        ? "No Transcripts Available" 
+        : "Analysis Failed";
+      
+      const description = errorData?.message || error.message || "An error occurred while analyzing the videos";
+      
       toast({
-        title: "Analysis Failed",
-        description: error.message || "An error occurred while analyzing the videos",
+        title,
+        description,
         variant: "destructive",
       });
     },
