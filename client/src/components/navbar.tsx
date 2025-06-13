@@ -29,7 +29,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             {user ? (
-              <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+              <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src={logoImage} alt="SocialScouter" className="h-10 w-auto" />
               </Link>
             ) : (
