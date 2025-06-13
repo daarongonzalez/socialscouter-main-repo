@@ -182,9 +182,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (results.length === 0) {
+        let errorMessage = "No videos could be processed. ";
+        if (failedUrls.length > 0) {
+          errorMessage += `The following URLs had no available transcripts: ${failedUrls.join(', ')}. `;
+          errorMessage += "This often happens with videos that don't have auto-generated captions or subtitles. ";
+          errorMessage += "Try using videos with spoken content or captions enabled.";
+        } else {
+          errorMessage += "Please check your URLs and try again.";
+        }
+        
         return res.status(400).json({
-          error: "No videos could be processed",
-          message: "Please check your URLs and try again."
+          error: "No transcripts available",
+          message: errorMessage,
+          failedUrls: failedUrls
         });
       }
 
