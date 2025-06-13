@@ -28,9 +28,15 @@ export function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
-            <a href="https://socialscouter.ai/" className="flex items-center hover:opacity-80 transition-opacity">
-              <img src={logoImage} alt="SocialScouter" className="h-10 w-auto" />
-            </a>
+            {user ? (
+              <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src={logoImage} alt="SocialScouter" className="h-10 w-auto" />
+              </Link>
+            ) : (
+              <a href="https://socialscouter.ai/" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src={logoImage} alt="SocialScouter" className="h-10 w-auto" />
+              </a>
+            )}
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
             <Link href="/history">
