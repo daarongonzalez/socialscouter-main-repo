@@ -124,6 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process each video URL
       const results = [];
+      const failedUrls = [];
       let totalWords = 0;
       let totalConfidence = 0;
       const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
@@ -138,6 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (!transcript) {
             console.warn(`Failed to get transcript for URL: ${url}`);
+            failedUrls.push(url);
             continue;
           }
 
