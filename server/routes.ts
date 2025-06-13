@@ -6,10 +6,10 @@ import { ZodError } from "zod";
 import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -35,11 +35,11 @@ function getPlanFromPriceId(priceId: string): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
-
-  // Setup Replit Auth strategies (session/passport already initialized in index.ts)
-  await setupAuth(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -64,146 +64,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint
+  // Analyze videos endpoint - now requires authentication
   app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const startTime = Date.now();
       
-      // Validate input
-      const validationResults = analyzeVideosSchema.safeParse(req.body);
-      if (!validationResults.success) {
-        return res.status(400).json({ 
-          error: "Invalid request", 
-          details: validationResults.error.errors 
+      // Validate request body
+      const validationResult = analyzeVideosSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          error: "Invalid request data",
+          details: validationResult.error.issues
         });
       }
 
-      const { urls, contentType, includeTimestamps } = validationResults.data;
+      const { urls, contentType, includeTimestamps } = validationResult.data;
+      const userId = req.user.claims.sub;
 
-      // Check usage limits
-      const limitCheck = await planLimitsService.checkUserLimits(userId, urls.length);
+      // Sanitize and validate URLs
+      const sanitizedUrls: string[] = [];
+      for (const url of urls) {
+        try {
+          const sanitizedUrl = InputSanitizer.sanitizeUrl(url);
+          sanitizedUrls.push(sanitizedUrl);
+        } catch (error) {
+          return res.status(400).json({
+            error: "Invalid URL",
+            message: `URL validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          });
+        }
+      }
+
+      // Check user limits before processing
+      const limitCheck = await planLimitsService.checkUserLimits(userId, sanitizedUrls.length);
       if (!limitCheck.canProceed) {
         return res.status(403).json({
-          error: limitCheck.errorMessage,
+          error: "Usage limit exceeded",
+          message: limitCheck.errorMessage,
           currentUsage: limitCheck.currentUsage,
           planLimits: limitCheck.planLimits
         });
       }
 
-      // Sanitize URLs
-      const sanitizedUrls = urls.map(url => InputSanitizer.sanitizeUrl(url));
-
-      // Create batch analysis record
-      const batchData = {
+      // Create batch analysis record first (with placeholder data)
+      const batchAnalysis = await storage.createBatchAnalysis({
         userId,
         contentType,
         totalVideos: sanitizedUrls.length,
-        totalWords: 0,
-        avgConfidence: 0,
-        processingTime: 0,
+        totalWords: 0, // Will be updated
+        avgConfidence: 0, // Will be updated  
+        processingTime: 0, // Will be updated
         sentimentCounts: JSON.stringify({ POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 })
-      };
+      });
 
-      const batch = await storage.createBatchAnalysis(batchData);
-      const startTime = Date.now();
-      
-      // Process each URL
-      const results: any[] = [];
+      // Process each video URL
+      const results = [];
       let totalWords = 0;
       let totalConfidence = 0;
       const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+      let totalPositiveScore = 0;
+      let totalNeutralScore = 0;
+      let totalNegativeScore = 0;
 
       for (const url of sanitizedUrls) {
         try {
-          // Get transcript
+          // Get transcript from video URL
           const transcript = await transcriptService.getTranscript(url, contentType);
+          
           if (!transcript) {
-            console.warn(`Failed to get transcript for ${url}`);
+            console.warn(`Failed to get transcript for URL: ${url}`);
             continue;
           }
 
           // Analyze sentiment
           const sentimentResult = await sentimentService.analyzeSentiment(transcript);
-          const wordCount = transcript.split(/\s+/).length;
+          console.log(`Sentiment result for ${url}:`, sentimentResult);
           
-          // Store result
+          // Count words in transcript
+          const wordCount = transcript.split(/\s+/).length;
+          totalWords += wordCount;
+          totalConfidence += sentimentResult.confidence;
+
+          // Count sentiment occurrences
+          sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
+
+          // Accumulate scores for averaging
+          if (sentimentResult.scores) {
+            totalPositiveScore += sentimentResult.scores.positive;
+            totalNeutralScore += sentimentResult.scores.neutral;
+            totalNegativeScore += sentimentResult.scores.negative;
+          }
+
+          // Store analysis result with the correct batch ID
           const analysisResult = await storage.createAnalysisResult({
             url,
             platform: contentType,
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
-            transcript: InputSanitizer.sanitizeText(transcript),
+            transcript,
             wordCount,
             sentimentScores: JSON.stringify(sentimentResult.scores || {}),
-            batchId: batch.id
+            batchId: batchAnalysis.id
           });
 
           results.push(analysisResult);
-          totalWords += wordCount;
-          totalConfidence += sentimentResult.confidence;
-          sentimentCounts[sentimentResult.sentiment.toUpperCase() as keyof typeof sentimentCounts]++;
-
         } catch (error) {
           console.error(`Error processing URL ${url}:`, error);
+          // Continue with other URLs even if one fails
         }
       }
 
-      const processingTime = (Date.now() - startTime) / 1000;
-      const avgConfidence = results.length > 0 ? totalConfidence / results.length : 0;
+      if (results.length === 0) {
+        return res.status(400).json({
+          error: "No videos could be processed",
+          message: "Please check your URLs and try again."
+        });
+      }
 
-      // Calculate sentiment percentages
-      const totalResults = results.length;
-      const sentimentScores = {
-        positive: totalResults > 0 ? (sentimentCounts.POSITIVE / totalResults) * 100 : 0,
-        neutral: totalResults > 0 ? (sentimentCounts.NEUTRAL / totalResults) * 100 : 0,
-        negative: totalResults > 0 ? (sentimentCounts.NEGATIVE / totalResults) * 100 : 0
-      };
+      // Calculate averages
+      const avgConfidence = totalConfidence / results.length;
+      const processingTime = Date.now() - startTime;
 
-      // Record usage
-      await planLimitsService.recordVideoUsage(userId, results.length);
+      // Calculate average sentiment scores
+      const avgPositiveScore = Math.round(totalPositiveScore / results.length);
+      const avgNeutralScore = Math.round(totalNeutralScore / results.length);
+      const avgNegativeScore = Math.round(totalNegativeScore / results.length);
+
+      console.log("Sentiment Score Debug:", {
+        totalPositiveScore,
+        totalNeutralScore,
+        totalNegativeScore,
+        resultsLength: results.length,
+        avgPositiveScore,
+        avgNeutralScore,
+        avgNegativeScore
+      });
+
+      // Record video usage after successful analysis
+      await planLimitsService.recordVideoUsage(userId, sanitizedUrls.length);
 
       const response: AnalyzeVideosResponse = {
-        batchId: batch.id,
+        batchId: batchAnalysis.id,
         results,
         summary: {
           totalVideos: results.length,
           totalWords,
-          avgConfidence,
+          avgConfidence: Math.round(avgConfidence),
           processingTime,
           sentimentCounts,
-          sentimentScores
+          sentimentScores: {
+            positive: avgPositiveScore,
+            neutral: avgNeutralScore,
+            negative: avgNegativeScore
+          }
         }
       };
 
       res.json(response);
-
     } catch (error) {
-      console.error('Error in analyze endpoint:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error("Error in analyze endpoint:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "An unexpected error occurred while processing your request. Please try again."
+      });
     }
   });
 
-  // Get batch analysis results
+  // Get batch analysis results - requires authentication and ownership verification
   app.get("/api/batch/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
       const batchId = InputSanitizer.validateBatchId(req.params.id);
+
+      const userId = req.user.claims.sub;
+      const batchAnalysis = await storage.getBatchAnalysis(batchId);
       
-      const batch = await storage.getBatchAnalysis(batchId);
-      if (!batch) {
-        return res.status(404).json({ error: "Batch not found" });
+      if (!batchAnalysis) {
+        return res.status(404).json({ error: "Batch analysis not found" });
       }
-      
-      // Verify ownership
-      if (batch.userId !== userId) {
+
+      // Verify ownership - user can only access their own batch analyses
+      if (batchAnalysis.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      
+
       const results = await storage.getAnalysisResultsByBatchId(batchId);
-      res.json({ batch, results });
+      
+      res.json({
+        batch: batchAnalysis,
+        results
+      });
     } catch (error) {
-      console.error('Error fetching batch:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error("Error fetching batch analysis:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -214,8 +266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batches = await storage.getUserBatchAnalyses(userId);
       res.json(batches);
     } catch (error) {
-      console.error('Error fetching history:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error("Error fetching history:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -224,10 +276,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const planInfo = await planLimitsService.getUserPlanInfo(userId);
+      
+      if (!planInfo) {
+        return res.status(404).json({ error: "User plan information not found" });
+      }
+
       res.json(planInfo);
     } catch (error) {
-      console.error('Error fetching plan info:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error("Error fetching user plan info:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -235,23 +292,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { priceId } = req.body;
+      const user = await storage.getUser(userId);
+      const { priceId, planName } = req.body;
 
-      if (!priceId) {
-        return res.status(400).json({ error: 'Price ID is required' });
-      }
-
-      // Get or create Stripe customer
-      let user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+      if (!user?.email) {
+        return res.status(400).json({ error: 'User email is required' });
       }
 
       let customerId = user.stripeCustomerId;
+
+      // Create customer if doesn't exist
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: user.email || undefined,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         });
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, '');
@@ -262,27 +316,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: customerId,
         items: [{ price: priceId }],
         payment_behavior: 'default_incomplete',
-        payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent'],
       });
+
+      // Update user with subscription info
+      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
       res.json({
         subscriptionId: subscription.id,
         clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
       });
-    } catch (error) {
-      console.error('Error creating subscription:', error);
-      res.status(500).json({ error: 'Failed to create subscription' });
+    } catch (error: any) {
+      console.error('Subscription creation error:', error);
+      res.status(400).json({ error: error.message });
     }
   });
 
   // Stripe webhook endpoint (must be before JSON body parsing middleware)
   app.post('/api/stripe/webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
-    let event;
+    let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig as string, process.env.STRIPE_WEBHOOK_SECRET!);
+      // Verify webhook signature
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        console.error('Missing STRIPE_WEBHOOK_SECRET environment variable');
+        return res.status(400).send('Webhook secret not configured');
+      }
+
+      event = stripe.webhooks.constructEvent(req.body, sig as string, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -291,61 +353,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Handle the event
     try {
       switch (event.type) {
+        case 'customer.subscription.created':
         case 'customer.subscription.updated':
           await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
           break;
+        
         case 'customer.subscription.deleted':
           await handleSubscriptionCanceled(event.data.object as Stripe.Subscription);
           break;
+        
         case 'invoice.payment_succeeded':
           await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
           break;
+        
         case 'invoice.payment_failed':
           await handlePaymentFailed(event.data.object as Stripe.Invoice);
           break;
+        
         default:
-          console.log(`Unhandled event type ${event.type}`);
+          console.log(`Unhandled event type: ${event.type}`);
       }
 
       res.json({ received: true });
-    } catch (error) {
-      console.error('Error handling webhook:', error);
-      res.status(500).json({ error: 'Webhook handler failed' });
+    } catch (error: any) {
+      console.error('Error processing webhook:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
     }
   });
 
+  // Webhook handler functions
   async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
     const status = subscription.status;
     
-    // Extract plan from subscription items
-    let planType = null;
+    // Determine plan from price ID
+    let plan = null;
     if (subscription.items.data.length > 0) {
       const priceId = subscription.items.data[0].price.id;
-      planType = getPlanFromPriceId(priceId);
+      plan = getPlanFromPriceId(priceId);
     }
-    
-    await storage.updateUserSubscription(customerId, status, planType || undefined);
-    console.log(`Subscription updated for customer ${customerId}: ${status}, plan: ${planType}`);
+
+    // Map Stripe statuses to our internal statuses
+    let subscriptionStatus = 'inactive';
+    if (status === 'active' || status === 'trialing') {
+      subscriptionStatus = 'active';
+    } else if (status === 'past_due') {
+      subscriptionStatus = 'past_due';
+    } else if (status === 'canceled' || status === 'unpaid') {
+      subscriptionStatus = 'canceled';
+    }
+
+    await storage.updateUserSubscription(customerId, subscriptionStatus, plan ?? undefined);
+    console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus} (${plan})`);
   }
 
   async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
     await storage.updateUserSubscription(customerId, 'canceled');
-    console.log(`Subscription canceled for customer ${customerId}`);
+    console.log(`Canceled subscription for customer ${customerId}`);
   }
 
   async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-    const customerId = invoice.customer as string;
-    console.log(`Payment succeeded for customer ${customerId}`);
-    // Additional logic for successful payments can be added here
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId && typeof subscriptionId === 'string') {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      await handleSubscriptionUpdate(subscription);
+      console.log(`Payment succeeded for subscription ${subscription.id}`);
+    }
   }
 
   async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    const customerId = invoice.customer as string;
-    console.log(`Payment failed for customer ${customerId}`);
-    // Additional logic for failed payments can be added here
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId) {
+      const customerId = invoice.customer as string;
+      await storage.updateUserSubscription(customerId, 'past_due');
+      console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+    }
   }
 
-  return createServer(app);
+  const httpServer = createServer(app);
+  return httpServer;
 }
