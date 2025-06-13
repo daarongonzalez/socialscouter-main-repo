@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { History, BarChart3, User, LogOut, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import logoImage from "@assets/icon-name-small.png";
 
 export function Navbar() {
   const { user } = useAuth();
@@ -28,7 +29,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <a href="https://socialscouter.ai/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <img src="/assets/icon-name-small.png" alt="SocialScouter" className="w-8 h-8" />
+              <img src={logoImage} alt="SocialScouter" className="w-8 h-8" />
               <span className="text-xl font-bold text-neutral-800">SocialScouter</span>
             </a>
           </div>
