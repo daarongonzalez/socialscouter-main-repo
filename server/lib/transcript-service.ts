@@ -111,12 +111,17 @@ export class TranscriptService {
       const endpoint = `${this.baseUrl}/v1/youtube/video/transcript`;
       const params = new URLSearchParams({ url: url });
 
+      console.log(`Fetching YouTube transcript for: ${url}`);
+      console.log(`API endpoint: ${endpoint}?${params}`);
+
       const response = await fetch(`${endpoint}?${params}`, {
         method: 'GET',
         headers: {
           'x-api-key': this.apiKey
         }
       });
+
+      console.log(`YouTube API response status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -125,9 +130,11 @@ export class TranscriptService {
       }
 
       const data = await response.json();
+      console.log(`YouTube API response data:`, JSON.stringify(data, null, 2));
       
       // Use transcript_only_text if available, otherwise combine transcript array
       if (data.transcript_only_text) {
+        console.log(`Found transcript_only_text for ${url}`);
         return data.transcript_only_text;
       }
 
@@ -136,10 +143,11 @@ export class TranscriptService {
           .map((item: any) => item.text)
           .filter((text: string) => text && text.trim())
           .join(' ');
+        console.log(`Combined transcript text for ${url}:`, combinedText ? 'Found' : 'Empty');
         return combinedText || null;
       }
 
-      console.warn(`No YouTube transcript found for ${url}`);
+      console.warn(`No YouTube transcript found for ${url}. Response structure:`, Object.keys(data));
       return null;
     } catch (error) {
       console.error(`YouTube transcript error for ${url}:`, error);
