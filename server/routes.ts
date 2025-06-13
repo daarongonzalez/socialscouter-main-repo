@@ -21,14 +21,19 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 // Helper function to extract plan from price ID
 function getPlanFromPriceId(priceId: string): string | null {
-  // Map Stripe price IDs to plan names
+  // Map actual Stripe price IDs to plan names
   const priceToPlans: { [key: string]: string } = {
-    'price_starter_monthly': 'starter',
-    'price_starter_yearly': 'starter',
-    'price_business_monthly': 'business', 
-    'price_business_yearly': 'business',
-    'price_enterprise_monthly': 'enterprise',
-    'price_enterprise_yearly': 'enterprise'
+    // Starter plans
+    'price_1RVfTT2MTD7ADXrKJFfxbBpF': 'starter', // $29/month - Starter Tier
+    'price_1RW6gp2MTD7ADXrKajpegBna': 'starter', // $279/year - Starter Tier
+    
+    // Business plans  
+    'price_1RVfZ02MTD7ADXrK9BhHfTCb': 'business', // $49/month - Business Tier
+    'price_1RW6jA2MTD7ADXrKJppgZcP1': 'business', // $470/year - Business Tier
+    
+    // Enterprise plans
+    'price_1RW6de2MTD7ADXrKSbM0Iz6B': 'enterprise', // $129/month - Enterprise Tier
+    'price_1RW6kz2MTD7ADXrKVxkkKteC': 'enterprise', // $1238/year - Enterprise Tier
   };
   
   return priceToPlans[priceId] || null;
@@ -352,21 +357,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Handle the event
     try {
+      console.log(`Received Stripe webhook event: ${event.type}`);
+      
       switch (event.type) {
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
+          console.log(`Processing subscription event: ${event.type}`);
           await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
           break;
         
         case 'customer.subscription.deleted':
+          console.log(`Processing subscription deletion`);
           await handleSubscriptionCanceled(event.data.object as Stripe.Subscription);
           break;
         
         case 'invoice.payment_succeeded':
+          console.log(`Processing payment success`);
           await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
           break;
         
         case 'invoice.payment_failed':
+          console.log(`Processing payment failure`);
           await handlePaymentFailed(event.data.object as Stripe.Invoice);
           break;
         
@@ -374,6 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Unhandled event type: ${event.type}`);
       }
 
+      console.log(`Successfully processed webhook event: ${event.type}`);
       res.json({ received: true });
     } catch (error: any) {
       console.error('Error processing webhook:', error);
@@ -386,11 +398,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const customerId = subscription.customer as string;
     const status = subscription.status;
     
+    console.log(`Processing subscription update:`, {
+      subscriptionId: subscription.id,
+      customerId,
+      status,
+      items: subscription.items.data.length
+    });
+    
     // Determine plan from price ID
     let plan = null;
     if (subscription.items.data.length > 0) {
       const priceId = subscription.items.data[0].price.id;
       plan = getPlanFromPriceId(priceId);
+      console.log(`Price ID: ${priceId}, Mapped plan: ${plan}`);
     }
 
     // Map Stripe statuses to our internal statuses
@@ -403,8 +423,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       subscriptionStatus = 'canceled';
     }
 
-    await storage.updateUserSubscription(customerId, subscriptionStatus, plan ?? undefined);
-    console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus} (${plan})`);
+    console.log(`Updating customer ${customerId} to status: ${subscriptionStatus}, plan: ${plan}`);
+    
+    try {
+      const updatedUser = await storage.updateUserSubscription(customerId, subscriptionStatus, plan ?? undefined);
+      if (updatedUser) {
+        console.log(`Successfully updated user ${updatedUser.id} subscription`);
+      } else {
+        console.error(`No user found with stripe customer ID: ${customerId}`);
+      }
+    } catch (error) {
+      console.error(`Error updating subscription for customer ${customerId}:`, error);
+      throw error;
+    }
   }
 
   async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
