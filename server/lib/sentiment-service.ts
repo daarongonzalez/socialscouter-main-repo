@@ -13,13 +13,13 @@ export class SentimentService {
   private awsAccessKey: string;
   private awsSecretKey: string;
   private awsRegion: string;
-  private anthropicApiKey: string;
+  private openaiApiKey: string;
 
   constructor() {
     this.awsAccessKey = process.env.AWS_ACCESS_KEY_ID || "";
     this.awsSecretKey = process.env.AWS_SECRET_ACCESS_KEY || "";
     this.awsRegion = process.env.AWS_REGION || "us-east-1";
-    this.anthropicApiKey = process.env.ANTHROPIC_API_KEY || "";
+    this.openaiApiKey = process.env.OPENAI_API_KEY || "";
   }
 
   async analyzeSentiment(text: string): Promise<SentimentResult> {
@@ -32,9 +32,9 @@ export class SentimentService {
         return await this.analyzeWithAWS(sentences);
       }
       
-      // Fallback to Claude
-      if (this.anthropicApiKey) {
-        return await this.analyzeWithClaude(text);
+      // Fallback to OpenAI
+      if (this.openaiApiKey) {
+        return await this.analyzeWithOpenAI(text);
       }
       
       // Fallback to local analysis
@@ -93,30 +93,37 @@ export class SentimentService {
     }
   }
 
-  private async analyzeWithClaude(text: string): Promise<SentimentResult> {
+  private async analyzeWithOpenAI(text: string): Promise<SentimentResult> {
     try {
-      const Anthropic = await import('@anthropic-ai/sdk');
-      const anthropic = new Anthropic.default({
-        apiKey: this.anthropicApiKey,
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [{
+            role: 'user',
+            content: `Analyze the sentiment of this text and respond with ONLY a JSON object in this exact format: {"sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "confidence": 85, "scores": {"positive": 20, "neutral": 60, "negative": 20}}. The scores should add up to 100. Text to analyze: "${text}"`
+          }],
+          temperature: 0.1,
+          max_tokens: 100
+        })
       });
 
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514', // the newest Anthropic model is "claude-sonnet-4-20250514" which was released May 14, 2025. Use this by default unless user has already selected claude-3-7-sonnet-20250219
-        system: `You're a Customer Insights AI. Analyze this feedback and output in JSON format with keys: "sentiment" (POSITIVE/NEGATIVE/NEUTRAL), "confidence" (number, 0 through 100), and "scores" with keys "positive", "neutral", and "negative" (numbers that add up to 100).`,
-        max_tokens: 1024,
-        messages: [
-          { role: 'user', content: text }
-        ],
-      });
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
 
-      const textBlock = response.content.find(block => block.type === 'text');
-      const content = textBlock ? (textBlock as any).text : "";
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content || "";
       
       try {
         const result = JSON.parse(content);
         return {
           sentiment: result.sentiment,
-          confidence: Math.max(0, Math.min(100, result.confidence || 75)),
+          confidence: result.confidence || 75,
           scores: result.scores || {
             positive: result.sentiment === 'POSITIVE' ? 80 : 20,
             neutral: result.sentiment === 'NEUTRAL' ? 80 : 20,
@@ -124,11 +131,11 @@ export class SentimentService {
           }
         };
       } catch (parseError) {
-        console.error("Failed to parse Claude response:", content);
+        console.error("Failed to parse OpenAI response:", content);
         throw parseError;
       }
     } catch (error) {
-      console.error("Claude error:", error);
+      console.error("OpenAI error:", error);
       throw error;
     }
   }

@@ -7,35 +7,23 @@ import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import HistoryPage from "@/pages/history";
 import Subscribe from "@/pages/subscribe";
-import Landing from "@/pages/landing";
+import LoginPortal from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    // If on dashboard route but not authenticated, redirect to login
-    if (window.location.pathname === '/dashboard') {
-      window.location.href = '/api/login';
-      return null;
-    }
-    return <Landing />;
-  }
-
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/history" component={HistoryPage} />
-      <Route path="/subscribe" component={Subscribe} />
+      {isLoading || !isAuthenticated ? (
+        <Route path="/" component={LoginPortal} />
+      ) : (
+        <>
+          <Route path="/" component={Dashboard} />
+          <Route path="/history" component={HistoryPage} />
+          <Route path="/subscribe" component={Subscribe} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );

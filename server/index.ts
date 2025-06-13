@@ -4,13 +4,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { csrfMiddleware } from "./lib/csrf-middleware";
-import { getSession } from "./replitAuth";
-import passport from "passport";
 
 const app = express();
-
-// Set trust proxy before configuring middleware
-app.set("trust proxy", 1);
 
 // Security headers with production HTTPS enforcement
 app.use(helmet({
@@ -83,22 +78,10 @@ app.use('/api/analyze', analysisLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Apply session and passport middleware globally
-try {
-  app.use(getSession());
-  app.use(passport.initialize());
-  app.use(passport.session());
-} catch (error) {
-  console.error('Session middleware error:', error);
-}
-
-// Apply CSRF protection (skip for webhooks, health, and auth routes)
+// CSRF protection for all routes except webhooks
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/stripe/webhook') || 
-      req.path === '/api/health' ||
-      req.path.startsWith('/api/login') || 
-      req.path.startsWith('/api/callback') || 
-      req.path.startsWith('/api/logout')) {
+  // Skip CSRF for webhooks and health checks
+  if (req.path.startsWith('/api/stripe/webhook') || req.path === '/api/health') {
     return next();
   }
   csrfMiddleware(req, res, next);

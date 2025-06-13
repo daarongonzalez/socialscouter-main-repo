@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { History, BarChart3, User, LogOut, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import iconNameSmall from "@assets/icon-name-small.png";
 
 export function Navbar() {
   const { user } = useAuth();
@@ -29,7 +28,8 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <a href="https://socialscouter.ai/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
+              <img src="/assets/icon-name-small.png" alt="SocialScouter" className="w-8 h-8" />
+              <span className="text-xl font-bold text-neutral-800">SocialScouter</span>
             </a>
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
@@ -46,6 +46,44 @@ export function Navbar() {
               <BarChart3 className="h-4 w-4 mr-2" />
               Ads Analyzer
             </Button>
+            
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.profileImageUrl} alt={user?.email} />
+                    <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <div className="flex items-center justify-start gap-2 p-2">
+                  <div className="flex flex-col space-y-1 leading-none">
+                    {user?.firstName && user?.lastName && (
+                      <p className="font-medium">{user.firstName} {user.lastName}</p>
+                    )}
+                    {user?.email && (
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/subscribe" className="w-full flex items-center">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    <span>Subscription</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
       </div>
