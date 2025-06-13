@@ -75,7 +75,7 @@ export function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/subscribe" className="w-full flex items-center">
                     <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Subscription</span>
+                    Subscription
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
