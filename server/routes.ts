@@ -6,7 +6,7 @@ import { ZodError } from "zod";
 import { TranscriptService } from "./lib/transcript-service";
 import { SentimentService } from "./lib/sentiment-service";
 import { planLimitsService } from "./lib/plan-limits-service";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { getSession } from "./session";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
@@ -40,22 +40,16 @@ function getPlanFromPriceId(priceId: string): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Session middleware for CSRF and state management
+  app.use(getSession());
 
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
+  // Auth routes - temporarily disabled during auth provider migration
+  app.get('/api/auth/user', async (req: any, res) => {
+    // TODO: Replace with new authentication provider
+    res.status(401).json({ message: "Authentication system under maintenance" });
   });
 
   // Health check endpoint
@@ -69,8 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint - now requires authentication
-  app.post("/api/analyze", isAuthenticated, async (req: any, res) => {
+  // Analyze videos endpoint - temporarily disabled during auth provider migration
+  app.post("/api/analyze", async (req: any, res) => {
     try {
       const startTime = Date.now();
       
@@ -84,7 +78,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { urls, contentType, includeTimestamps } = validationResult.data;
-      const userId = req.user.claims.sub;
+      // TODO: Replace with new authentication provider user ID
+      return res.status(401).json({ error: "Authentication required", message: "Please sign in to analyze videos" });
 
       // Sanitize and validate URLs
       const sanitizedUrls: string[] = [];
