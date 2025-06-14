@@ -15,12 +15,9 @@ export default function LoginPortal() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedPlan, setSelectedPlan] = useState("");
 
-  const handleReplotLogin = () => {
-    window.location.href = "/api/login";
-  };
-
-  const handleGoogleLogin = () => {
-    window.location.href = "/api/login";
+  const handleAuthAction = () => {
+    // Authentication system temporarily disabled during migration
+    alert("Authentication system is currently under maintenance. Please check back soon!");
   };
 
   const handleSignUpClick = () => {
@@ -28,17 +25,15 @@ export default function LoginPortal() {
       // Show pricing table when signing up
       setShowPricing(true);
     } else {
-      // Handle login
-      handleReplotLogin();
+      // Handle login - currently disabled
+      handleAuthAction();
     }
   };
 
   const handlePlanSelect = (plan: string, isYearly: boolean) => {
     setSelectedPlan(`${plan}-${isYearly ? 'yearly' : 'monthly'}`);
-    // Here you would typically redirect to payment processing
-    console.log(`Selected plan: ${plan} (${isYearly ? 'yearly' : 'monthly'})`);
-    // For now, redirect to login
-    handleReplotLogin();
+    // Authentication system temporarily disabled during migration
+    handleAuthAction();
   };
 
   const handleBackToSignup = () => {
@@ -64,7 +59,7 @@ export default function LoginPortal() {
           <Button 
             variant="default" 
             className="bg-blue-ribbon hover:opacity-90 text-white px-6"
-            onClick={handleReplotLogin}
+            onClick={handleAuthAction}
           >Login</Button>
         </div>
       </header>
@@ -216,7 +211,7 @@ export default function LoginPortal() {
                   variant="outline"
                   className="w-full mt-4 border hover:bg-muted"
                   style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--neutral-600))' }}
-                  onClick={handleGoogleLogin}
+                  onClick={handleAuthAction}
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
