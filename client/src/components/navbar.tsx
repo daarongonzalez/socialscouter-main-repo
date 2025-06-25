@@ -9,8 +9,14 @@ import logoImage from "@assets/icon-name-small.png";
 export function Navbar() {
   const { user } = useAuth();
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      const { logOut } = await import("@/lib/firebase");
+      await logOut();
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const getUserInitials = (user: any) => {

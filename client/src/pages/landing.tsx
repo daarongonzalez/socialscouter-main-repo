@@ -15,9 +15,14 @@ export default function LoginPortal() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedPlan, setSelectedPlan] = useState("");
 
-  const handleAuthAction = () => {
-    // Authentication system temporarily disabled during migration
-    alert("Authentication system is currently under maintenance. Please check back soon!");
+  const handleAuthAction = async () => {
+    try {
+      const { signInWithGoogle } = await import("@/lib/firebase");
+      await signInWithGoogle();
+    } catch (error) {
+      console.error("Authentication error:", error);
+      alert("Authentication failed. Please try again.");
+    }
   };
 
   const handleSignUpClick = () => {

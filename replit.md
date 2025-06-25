@@ -31,8 +31,8 @@ SocialScouter AI is a comprehensive web application that analyzes sentiment in s
 ## Key Components
 
 ### Authentication and Authorization
-- OAuth integration with Replit authentication service
-- Session-based authentication with secure cookie configuration
+- Firebase Authentication with Google OAuth provider
+- JWT token-based authentication with Firebase Admin SDK verification
 - User profile management with Stripe customer integration
 - Role-based access control for subscription tiers
 
@@ -96,6 +96,15 @@ SocialScouter AI is a comprehensive web application that analyzes sentiment in s
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes
+
+- June 25, 2025: Firebase Authentication integration completed
+  - Replaced Replit Auth with Firebase Auth using Google OAuth
+  - Updated frontend to use Firebase SDK for authentication flow
+  - Implemented Firebase Admin SDK for backend token verification
+  - Updated all API endpoints to support Firebase authentication
+  - Modified query client to automatically include Firebase JWT tokens
 
 ## Changelog
 
