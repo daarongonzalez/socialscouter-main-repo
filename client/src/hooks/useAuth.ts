@@ -15,17 +15,6 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    // Handle redirect result on page load
-    handleRedirectResult().then((result) => {
-      if (result?.user) {
-        setFirebaseUser(result.user);
-        // Invalidate queries to refetch user data
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      }
-    }).catch((error) => {
-      console.error("Error handling redirect result:", error);
-    });
-
     // Listen to auth state changes
     const unsubscribe = onAuthStateChange((user) => {
       setFirebaseUser(user);
@@ -39,6 +28,17 @@ export function useAuth() {
         queryClient.clear();
       }
     });
+
+    // Handle redirect result on page load (only in production)
+    if (!import.meta.env.DEV) {
+      handleRedirectResult().then((result) => {
+        if (result?.user) {
+          console.log("Redirect authentication successful");
+        }
+      }).catch((error) => {
+        console.error("Error handling redirect result:", error);
+      });
+    }
 
     return () => unsubscribe();
   }, [queryClient]);
