@@ -17,7 +17,7 @@ SocialScouter AI is a comprehensive web application that analyzes sentiment in s
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ESM modules
-- **Authentication**: Replit Auth (OAuth-based)
+- **Authentication**: Firebase Auth (OAuth-based)
 - **Database**: PostgreSQL with Drizzle ORM
 - **Session Management**: Express sessions with PostgreSQL store
 - **Security**: Helmet.js, CSRF protection, rate limiting
@@ -57,7 +57,7 @@ SocialScouter AI is a comprehensive web application that analyzes sentiment in s
 
 ## Data Flow
 
-1. **User Authentication**: OAuth flow through Replit Auth service
+1. **User Authentication**: OAuth flow through Firebase Auth service
 2. **Video Analysis Request**: User submits batch of video URLs
 3. **Transcript Extraction**: ScrapeCreators API fetches video transcripts
 4. **Sentiment Analysis**: Multi-provider analysis with fallback chain
@@ -68,7 +68,7 @@ SocialScouter AI is a comprehensive web application that analyzes sentiment in s
 
 ### Core Services
 - **Database**: Neon PostgreSQL serverless
-- **Authentication**: Replit OAuth service
+- **Authentication**: Firebase OAuth service
 - **Payment Processing**: Stripe API
 - **Sentiment Analysis**: AWS Comprehend, OpenAI API
 - **Transcript Extraction**: ScrapeCreators API
