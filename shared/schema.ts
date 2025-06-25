@@ -3,7 +3,7 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
+// Session storage table (kept for CSRF and other session data)
 export const sessions = pgTable(
   "sessions",
   {
@@ -14,9 +14,9 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth with Stripe integration
+// User storage table for Firebase Auth with Stripe integration
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(), // Replit user ID
+  id: varchar("id").primaryKey().notNull(), // Firebase user ID
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
