@@ -14,7 +14,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-eval'", "https://firebase.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:", "https://replit.com"],
+      imgSrc: ["'self'", "data:", "https:", "https://firebase.googleapis.com"],
       connectSrc: ["'self'", "ws:", "wss:", "https://firebase.googleapis.com", "https://*.firebaseio.com", "https://*.firebase.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
@@ -42,7 +42,9 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Rate limiting
+// Rate limiting with trust proxy for Replit environment
+app.set('trust proxy', 1);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
@@ -52,6 +54,7 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true,
 });
 
 // Apply rate limiting to all requests

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut, getRedirectResult } from "firebase/auth";
+import { getAuth, signInWithRedirect, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, getRedirectResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,8 +19,12 @@ const provider = new GoogleAuthProvider();
 provider.addScope('email');
 provider.addScope('profile');
 
-// Sign in with Google redirect
+// Sign in with Google - use popup for development, redirect for production
 export function signInWithGoogle() {
+  // In development, use popup to avoid domain issues
+  if (import.meta.env.DEV) {
+    return signInWithPopup(auth, provider);
+  }
   return signInWithRedirect(auth, provider);
 }
 
