@@ -3,10 +3,10 @@ import { getAuth } from 'firebase-admin/auth';
 
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
-  // For production, you would use a service account key
   // For development, we'll use the Firebase project ID
+  // In production, you would add a service account key
   initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    projectId: "social-scouter",
   });
 }
 
