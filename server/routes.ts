@@ -46,10 +46,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Auth routes - temporarily disabled during auth provider migration
+  // Auth routes with Firebase
   app.get('/api/auth/user', async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ message: "Authentication system under maintenance" });
+    try {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+
+      const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
+      
+      // Use middleware to authenticate and get user
+      authenticateFirebaseToken(req, res, () => {
+        res.json(req.user);
+      });
+    } catch (error) {
+      console.error('Auth error:', error);
+      res.status(401).json({ error: 'Authentication failed' });
+    }
   });
 
   // Health check endpoint
@@ -63,28 +78,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint - temporarily disabled during auth provider migration
+  // Analyze videos endpoint with Firebase auth
   app.post("/api/analyze", async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ error: "Authentication required", message: "Please sign in to analyze videos" });
+    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
+    
+    authenticateFirebaseToken(req, res, async () => {
+      try {
+        const validationErrors = validationResult(req);
+        if (!validationErrors.isEmpty()) {
+          return res.status(400).json({
+            error: "Validation failed",
+            details: validationErrors.array()
+          });
+        }
+
+        const startTime = Date.now();
+        const requestBody = analyzeVideosSchema.parse(req.body);
+        const userId = req.user.id;
+
+        // Check user limits
+        const limitCheck = await planLimitsService.checkUserLimits(userId, requestBody.urls.length);
+        if (!limitCheck.canProceed) {
+          return res.status(403).json({
+            error: "Usage limit exceeded",
+            message: limitCheck.errorMessage,
+            currentUsage: limitCheck.currentUsage,
+            planLimits: limitCheck.planLimits
+          });
+        }
+
+        // Create batch analysis record
+        const batch = await storage.createBatchAnalysis({
+          userId,
+          contentType: requestBody.contentType,
+          totalVideos: requestBody.urls.length,
+          processingStatus: 'completed'
+        });
+
+        // Process each URL
+        const results: any[] = [];
+        let totalWords = 0;
+        let totalConfidence = 0;
+        const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+        const sentimentScores = { positive: 0, neutral: 0, negative: 0 };
+
+        for (const url of requestBody.urls) {
+          const sanitizedUrl = InputSanitizer.sanitizeUrl(url);
+          
+          try {
+            // Get transcript
+            const transcript = await transcriptService.getTranscript(sanitizedUrl, requestBody.contentType);
+            
+            if (!transcript) {
+              results.push({
+                url: sanitizedUrl,
+                transcript: null,
+                sentiment: 'NEUTRAL',
+                confidence: 0,
+                scores: { positive: 0, neutral: 1, negative: 0 },
+                error: 'Could not extract transcript'
+              });
+              continue;
+            }
+
+            // Analyze sentiment
+            const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+            
+            // Create analysis result
+            const analysisResult = await storage.createAnalysisResult({
+              batchId: batch.id,
+              url: sanitizedUrl,
+              transcript: InputSanitizer.sanitizeText(transcript),
+              sentiment: sentimentResult.sentiment,
+              confidence: sentimentResult.confidence,
+              positiveScore: sentimentResult.scores?.positive || 0,
+              neutralScore: sentimentResult.scores?.neutral || 0,
+              negativeScore: sentimentResult.scores?.negative || 0
+            });
+
+            results.push(analysisResult);
+            totalWords += transcript.split(' ').length;
+            totalConfidence += sentimentResult.confidence;
+            
+            // Count sentiments
+            sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
+            
+            // Aggregate scores
+            if (sentimentResult.scores) {
+              sentimentScores.positive += sentimentResult.scores.positive;
+              sentimentScores.neutral += sentimentResult.scores.neutral;
+              sentimentScores.negative += sentimentResult.scores.negative;
+            }
+          } catch (error) {
+            console.error(`Error processing URL ${sanitizedUrl}:`, error);
+            results.push({
+              url: sanitizedUrl,
+              transcript: null,
+              sentiment: 'NEUTRAL',
+              confidence: 0,
+              scores: { positive: 0, neutral: 1, negative: 0 },
+              error: 'Processing failed'
+            });
+          }
+        }
+
+        // Record usage
+        await planLimitsService.recordVideoUsage(userId, requestBody.urls.length);
+
+        // Calculate averages
+        const totalVideos = results.length;
+        const avgConfidence = totalVideos > 0 ? totalConfidence / totalVideos : 0;
+        const processingTime = Date.now() - startTime;
+
+        // Normalize sentiment scores
+        const totalScore = sentimentScores.positive + sentimentScores.neutral + sentimentScores.negative;
+        if (totalScore > 0) {
+          sentimentScores.positive = sentimentScores.positive / totalScore;
+          sentimentScores.neutral = sentimentScores.neutral / totalScore;
+          sentimentScores.negative = sentimentScores.negative / totalScore;
+        }
+
+        const response: AnalyzeVideosResponse = {
+          batchId: batch.id,
+          results,
+          summary: {
+            totalVideos,
+            totalWords,
+            avgConfidence,
+            processingTime,
+            sentimentCounts,
+            sentimentScores
+          }
+        };
+
+        res.json(response);
+      } catch (error) {
+        console.error("Analysis error:", error);
+        if (error instanceof ZodError) {
+          return res.status(400).json({
+            error: "Invalid request data",
+            details: error.errors
+          });
+        }
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   });
 
-  // Get batch analysis results - temporarily disabled during auth provider migration
+  // Get batch analysis results with Firebase auth
   app.get("/api/batch/:id", async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ error: "Authentication required", message: "Please sign in to view analysis results" });
+    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
+    
+    authenticateFirebaseToken(req, res, async () => {
+      try {
+        const batchId = InputSanitizer.validateBatchId(req.params.id);
+        const batch = await storage.getBatchAnalysis(batchId);
+        
+        if (!batch) {
+          return res.status(404).json({ error: "Batch not found" });
+        }
+        
+        // Check if user owns this batch
+        if (batch.userId !== req.user.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        
+        const results = await storage.getAnalysisResultsByBatchId(batchId);
+        res.json({ batch, results });
+      } catch (error) {
+        console.error("Batch retrieval error:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   });
 
-  // Get user's batch analyses for history - temporarily disabled during auth provider migration
+  // Get user's batch analyses for history with Firebase auth
   app.get("/api/history", async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ error: "Authentication required", message: "Please sign in to view history" });
+    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
+    
+    authenticateFirebaseToken(req, res, async () => {
+      try {
+        const batches = await storage.getUserBatchAnalyses(req.user.id);
+        res.json(batches);
+      } catch (error) {
+        console.error("History retrieval error:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   });
 
-  // Get user plan information and usage - temporarily disabled during auth provider migration
+  // Get user plan information and usage with Firebase auth
   app.get("/api/user/plan", async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ error: "Authentication required", message: "Please sign in to view plan information" });
+    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
+    
+    authenticateFirebaseToken(req, res, async () => {
+      try {
+        const planInfo = await planLimitsService.getUserPlanInfo(req.user.id);
+        res.json(planInfo);
+      } catch (error) {
+        console.error("Plan info retrieval error:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   });
 
   // Stripe subscription routes - temporarily disabled during auth provider migration

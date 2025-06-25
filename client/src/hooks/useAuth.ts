@@ -1,15 +1,52 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { onAuthStateChange, handleRedirectResult } from "@/lib/firebase";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery({
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // Get user data from backend after Firebase auth
+  const { data: backendUser } = useQuery({
     queryKey: ["/api/auth/user"],
+    enabled: !!firebaseUser?.uid,
     retry: false,
-    staleTime: Infinity, // Don't refetch during auth migration
   });
 
+  useEffect(() => {
+    // Handle redirect result on page load
+    handleRedirectResult().then((result) => {
+      if (result?.user) {
+        setFirebaseUser(result.user);
+        // Invalidate queries to refetch user data
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      }
+    }).catch((error) => {
+      console.error("Error handling redirect result:", error);
+    });
+
+    // Listen to auth state changes
+    const unsubscribe = onAuthStateChange((user) => {
+      setFirebaseUser(user);
+      setIsLoading(false);
+      
+      if (user) {
+        // Invalidate queries to refetch user data when user signs in
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else {
+        // Clear all queries when user signs out
+        queryClient.clear();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [queryClient]);
+
   return {
-    user: null, // No user during auth migration
-    isLoading: false, // Not loading during auth migration
-    isAuthenticated: false, // Not authenticated during auth migration
+    user: backendUser || firebaseUser,
+    isLoading,
+    isAuthenticated: !!firebaseUser,
+    firebaseUser,
   };
 }
