@@ -78,42 +78,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint with Firebase auth
+  // Analyze videos endpoint (authentication bypassed)
   app.post("/api/analyze", async (req: any, res) => {
-    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
-    
-    authenticateFirebaseToken(req, res, async () => {
-      try {
-        const validationErrors = validationResult(req);
-        if (!validationErrors.isEmpty()) {
-          return res.status(400).json({
-            error: "Validation failed",
-            details: validationErrors.array()
-          });
-        }
-
-        const startTime = Date.now();
-        const requestBody = analyzeVideosSchema.parse(req.body);
-        const userId = req.user.id;
-
-        // Check user limits
-        const limitCheck = await planLimitsService.checkUserLimits(userId, requestBody.urls.length);
-        if (!limitCheck.canProceed) {
-          return res.status(403).json({
-            error: "Usage limit exceeded",
-            message: limitCheck.errorMessage,
-            currentUsage: limitCheck.currentUsage,
-            planLimits: limitCheck.planLimits
-          });
-        }
-
-        // Create batch analysis record
-        const batch = await storage.createBatchAnalysis({
-          userId,
-          contentType: requestBody.contentType,
-          totalVideos: requestBody.urls.length,
-          processingStatus: 'completed'
+    try {
+      const validationErrors = validationResult(req);
+      if (!validationErrors.isEmpty()) {
+        return res.status(400).json({
+          error: "Validation failed",
+          details: validationErrors.array()
         });
+      }
+
+      const startTime = Date.now();
+      const requestBody = analyzeVideosSchema.parse(req.body);
+      const userId = "anonymous"; // Use anonymous user for demo
+
+      // Skip user limits check for demo mode
+      const limitCheck = { canProceed: true, currentUsage: { monthlyVideoCount: 0, remainingVideos: 999 }, planLimits: { maxBatchSize: 50, monthlyVideoLimit: 1000 } };
+      if (!limitCheck.canProceed) {
+        return res.status(403).json({
+          error: "Usage limit exceeded",
+          message: "Demo mode limit reached",
+          currentUsage: limitCheck.currentUsage,
+          planLimits: limitCheck.planLimits
+        });
+      }
+
+      // Create batch analysis record
+      const batch = await storage.createBatchAnalysis({
+        userId,
+        contentType: requestBody.contentType,
+        totalVideos: requestBody.urls.length,
+        totalWords: 0,
+        avgConfidence: 0,
+        processingTime: 0,
+        sentimentCounts: JSON.stringify({ POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 })
+      });
 
         // Process each URL
         const results: any[] = [];
@@ -148,12 +148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const analysisResult = await storage.createAnalysisResult({
               batchId: batch.id,
               url: sanitizedUrl,
+              platform: requestBody.contentType,
               transcript: InputSanitizer.sanitizeText(transcript),
               sentiment: sentimentResult.sentiment,
               confidence: sentimentResult.confidence,
-              positiveScore: sentimentResult.scores?.positive || 0,
-              neutralScore: sentimentResult.scores?.neutral || 0,
-              negativeScore: sentimentResult.scores?.negative || 0
+              wordCount: transcript.split(' ').length,
+              sentimentScores: JSON.stringify(sentimentResult.scores || {})
             });
 
             results.push(analysisResult);
@@ -225,46 +225,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Get batch analysis results with Firebase auth
+  // Get batch analysis results (authentication bypassed)
   app.get("/api/batch/:id", async (req: any, res) => {
-    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
-    
-    authenticateFirebaseToken(req, res, async () => {
-      try {
-        const batchId = InputSanitizer.validateBatchId(req.params.id);
-        const batch = await storage.getBatchAnalysis(batchId);
-        
-        if (!batch) {
-          return res.status(404).json({ error: "Batch not found" });
-        }
-        
-        // Check if user owns this batch
-        if (batch.userId !== req.user.id) {
-          return res.status(403).json({ error: "Access denied" });
-        }
-        
-        const results = await storage.getAnalysisResultsByBatchId(batchId);
-        res.json({ batch, results });
-      } catch (error) {
-        console.error("Batch retrieval error:", error);
-        res.status(500).json({ error: "Internal server error" });
+    try {
+      const batchId = InputSanitizer.validateBatchId(req.params.id);
+      const batch = await storage.getBatchAnalysis(batchId);
+      
+      if (!batch) {
+        return res.status(404).json({ error: "Batch not found" });
       }
-    });
+      
+      const results = await storage.getAnalysisResultsByBatchId(batchId);
+      res.json({ batch, results });
+    } catch (error) {
+      console.error("Batch retrieval error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
-  // Get user's batch analyses for history with Firebase auth
+  // Get user's batch analyses for history (authentication bypassed)
   app.get("/api/history", async (req: any, res) => {
-    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
-    
-    authenticateFirebaseToken(req, res, async () => {
-      try {
-        const batches = await storage.getUserBatchAnalyses(req.user.id);
-        res.json(batches);
-      } catch (error) {
-        console.error("History retrieval error:", error);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    });
+    try {
+      const batches = await storage.getUserBatchAnalyses("anonymous");
+      res.json(batches);
+    } catch (error) {
+      console.error("History retrieval error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   // Get user plan information and usage with Firebase auth
