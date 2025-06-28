@@ -23,27 +23,90 @@ export class SentimentService {
   }
 
   async analyzeSentiment(text: string): Promise<SentimentResult> {
-    // Split text into sentences for more accurate analysis
-    const sentences = this.splitIntoSentences(text);
+    // Preprocess text for better social media analysis
+    const preprocessedText = this.preprocessSocialMediaText(text);
     
     try {
-      // Try AWS Comprehend first
+      // Try OpenAI first (primary option)
+      if (this.openaiApiKey) {
+        return await this.analyzeWithOpenAI(preprocessedText);
+      }
+      
+      // Fallback to AWS Comprehend
       if (this.awsAccessKey && this.awsSecretKey) {
+        const sentences = this.splitIntoSentences(preprocessedText);
         return await this.analyzeWithAWS(sentences);
       }
       
-      // Fallback to OpenAI
-      if (this.openaiApiKey) {
-        return await this.analyzeWithOpenAI(text);
-      }
-      
-      // Fallback to local analysis
-      return this.analyzeWithLocal(text);
+      // Final fallback to local analysis
+      return this.analyzeWithLocal(preprocessedText);
     } catch (error) {
       console.error("Error in sentiment analysis:", error);
+      // Try fallback methods if primary fails
+      try {
+        if (this.awsAccessKey && this.awsSecretKey) {
+          const sentences = this.splitIntoSentences(preprocessedText);
+          return await this.analyzeWithAWS(sentences);
+        }
+      } catch (awsError) {
+        console.error("AWS fallback also failed:", awsError);
+      }
+      
       // Return local analysis as final fallback
-      return this.analyzeWithLocal(text);
+      return this.analyzeWithLocal(preprocessedText);
     }
+  }
+
+  private preprocessSocialMediaText(text: string): string {
+    // Convert common social media expressions and emojis to sentiment-rich text
+    let processed = text;
+    
+    // Handle common social media abbreviations and slang
+    const socialMediaMappings = {
+      'lol': 'laughing out loud',
+      'lmao': 'laughing very hard',
+      'omg': 'oh my god',
+      'wtf': 'what the hell',
+      'tbh': 'to be honest',
+      'ngl': 'not going to lie',
+      'fr': 'for real',
+      'no cap': 'no lie',
+      'periodt': 'period emphasis',
+      'slay': 'amazing performance',
+      'fire': 'excellent',
+      'lowkey': 'somewhat',
+      'highkey': 'definitely',
+      'sus': 'suspicious',
+      'bet': 'yes definitely',
+      'fam': 'friend',
+      'bruh': 'disappointed expression',
+      'oop': 'awkward moment',
+      'stan': 'really support',
+      'slaps': 'is really good',
+      'hits different': 'is uniquely good',
+      'vibes': 'feeling',
+      'mood': 'relatable feeling'
+    };
+    
+    // Replace abbreviations with full sentiment-bearing phrases
+    for (const [abbrev, full] of Object.entries(socialMediaMappings)) {
+      const regex = new RegExp(`\\b${abbrev}\\b`, 'gi');
+      processed = processed.replace(regex, full);
+    }
+    
+    // Handle repeated letters for emphasis (e.g., "sooooo good" -> "very good")
+    processed = processed.replace(/(\w)\1{2,}/g, (match, letter) => {
+      return `very ${letter}`;
+    });
+    
+    // Handle multiple exclamation/question marks
+    processed = processed.replace(/!{2,}/g, ' with excitement');
+    processed = processed.replace(/\?{2,}/g, ' with confusion');
+    
+    // Clean up extra spaces
+    processed = processed.replace(/\s+/g, ' ').trim();
+    
+    return processed;
   }
 
   private splitIntoSentences(text: string): string[] {
@@ -95,6 +158,37 @@ export class SentimentService {
 
   private async analyzeWithOpenAI(text: string): Promise<SentimentResult> {
     try {
+      const enhancedPrompt = `You are an expert sentiment analyst specializing in social media content from TikTok, Instagram Reels, and YouTube Shorts. 
+
+Analyze the sentiment of this video transcript with these considerations:
+- Social media language patterns (slang, abbreviations, emojis)
+- Generational communication styles (Gen Z, millennial expressions)
+- Context clues and implicit emotions
+- Sarcasm, humor, and irony detection
+- Energy levels and enthusiasm indicators
+- Cultural references and trending phrases
+
+Be sensitive to nuanced emotions that might appear neutral but contain subtle positive/negative undertones.
+
+Examples of nuanced sentiment:
+- "not bad" = mildly positive
+- "could be worse" = cautiously positive
+- "whatever" = mildly negative/dismissive
+- "I guess" = uncertain/slightly negative
+- "kinda cool" = moderately positive
+- "lowkey amazing" = strongly positive but understated
+
+Respond with ONLY a JSON object in this exact format:
+{"sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "confidence": 85, "scores": {"positive": 25, "neutral": 50, "negative": 25}}
+
+Guidelines for scoring:
+- Confidence: 60-95 (higher for clear sentiment, lower for ambiguous)
+- Scores must add up to 100
+- Avoid extreme neutral bias (like 5% positive, 90% neutral, 5% negative)
+- Consider emotional intensity and context
+
+Text to analyze: "${text}"`;
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -102,13 +196,16 @@ export class SentimentService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4o-mini',
           messages: [{
+            role: 'system',
+            content: 'You are a highly skilled sentiment analysis expert specializing in social media content. You understand nuanced emotions, cultural context, and generational communication patterns.'
+          }, {
             role: 'user',
-            content: `Analyze the sentiment of this text and respond with ONLY a JSON object in this exact format: {"sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "confidence": 85, "scores": {"positive": 20, "neutral": 60, "negative": 20}}. The scores should add up to 100. Text to analyze: "${text}"`
+            content: enhancedPrompt
           }],
-          temperature: 0.1,
-          max_tokens: 100
+          temperature: 0.2,
+          max_tokens: 150
         })
       });
 
@@ -120,18 +217,38 @@ export class SentimentService {
       const content = data.choices[0]?.message?.content || "";
       
       try {
-        const result = JSON.parse(content);
+        // Clean the response in case there's extra text
+        const jsonMatch = content.match(/\{[^}]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : content;
+        const result = JSON.parse(jsonString);
+        
+        // Validate the response structure
+        if (!result.sentiment || !result.scores) {
+          throw new Error("Invalid response structure from OpenAI");
+        }
+        
+        // Ensure scores add up to 100
+        const totalScore = result.scores.positive + result.scores.neutral + result.scores.negative;
+        if (Math.abs(totalScore - 100) > 1) {
+          // Normalize scores if they don't add up to 100
+          const factor = 100 / totalScore;
+          result.scores.positive = Math.round(result.scores.positive * factor);
+          result.scores.negative = Math.round(result.scores.negative * factor);
+          result.scores.neutral = 100 - result.scores.positive - result.scores.negative;
+        }
+        
         return {
-          sentiment: result.sentiment,
-          confidence: result.confidence || 75,
-          scores: result.scores || {
-            positive: result.sentiment === 'POSITIVE' ? 80 : 20,
-            neutral: result.sentiment === 'NEUTRAL' ? 80 : 20,
-            negative: result.sentiment === 'NEGATIVE' ? 80 : 20
+          sentiment: result.sentiment.toUpperCase(),
+          confidence: Math.max(60, Math.min(95, result.confidence || 75)),
+          scores: {
+            positive: Math.max(0, result.scores.positive),
+            neutral: Math.max(0, result.scores.neutral),
+            negative: Math.max(0, result.scores.negative)
           }
         };
       } catch (parseError) {
         console.error("Failed to parse OpenAI response:", content);
+        console.error("Parse error:", parseError);
         throw parseError;
       }
     } catch (error) {
