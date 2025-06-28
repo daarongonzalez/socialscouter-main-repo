@@ -218,7 +218,7 @@ Text to analyze: "${text}"`;
       
       try {
         // Clean the response in case there's extra text
-        const jsonMatch = content.match(/\{[^}]*\}/);
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
         const jsonString = jsonMatch ? jsonMatch[0] : content;
         const result = JSON.parse(jsonString);
         
