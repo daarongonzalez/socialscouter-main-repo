@@ -258,36 +258,139 @@ Text to analyze: "${text}"`;
   }
 
   private analyzeWithLocal(text: string): SentimentResult {
-    // Simple lexicon-based approach for fallback
-    const positiveWords = [
-      'amazing', 'awesome', 'fantastic', 'great', 'excellent', 'wonderful', 'love', 'perfect',
-      'incredible', 'outstanding', 'brilliant', 'superb', 'marvelous', 'terrific', 'fabulous',
-      'good', 'nice', 'beautiful', 'happy', 'excited', 'thrilled', 'delighted', 'pleased'
-    ];
-    
-    const negativeWords = [
-      'terrible', 'awful', 'horrible', 'bad', 'worst', 'hate', 'disgusting', 'disappointing',
-      'frustrating', 'annoying', 'boring', 'stupid', 'ridiculous', 'useless', 'pathetic',
-      'sad', 'angry', 'upset', 'disappointed', 'confused', 'worried', 'concerned'
-    ];
+    // Enhanced lexicon-based approach with social media awareness
+    const sentimentLexicon = {
+      // Strong positive (weight: 3)
+      strongPositive: [
+        'amazing', 'awesome', 'fantastic', 'incredible', 'outstanding', 'brilliant', 'perfect',
+        'excellent', 'wonderful', 'superb', 'marvelous', 'terrific', 'fabulous', 'phenomenal',
+        'breathtaking', 'magnificent', 'spectacular', 'extraordinary', 'exceptional', 'flawless',
+        // Social media positive
+        'fire', 'slay', 'slaps', 'banger', 'iconic', 'legendary', 'goat', 'chef', 'kiss'
+      ],
+      
+      // Moderate positive (weight: 2)
+      moderatePositive: [
+        'good', 'nice', 'great', 'cool', 'sweet', 'solid', 'decent', 'fine', 'okay', 'alright',
+        'happy', 'pleased', 'satisfied', 'glad', 'excited', 'thrilled', 'delighted', 'enjoy',
+        'like', 'appreciate', 'recommend', 'impressive', 'helpful', 'useful', 'effective',
+        // Social media moderate positive
+        'vibes', 'mood', 'valid', 'bet', 'facts', 'real', 'true', 'based', 'w', 'dub'
+      ],
+      
+      // Mild positive (weight: 1)
+      mildPositive: [
+        'kinda', 'somewhat', 'pretty', 'quite', 'fairly', 'rather', 'not bad', 'could be worse',
+        'getting better', 'improving', 'progress', 'potential', 'promising', 'hopeful',
+        // Social media mild positive
+        'lowkey', 'ngl', 'tbh', 'fr', 'periodt', 'no cap', 'stan', 'support'
+      ],
+      
+      // Strong negative (weight: -3)
+      strongNegative: [
+        'terrible', 'awful', 'horrible', 'disgusting', 'pathetic', 'worst', 'hate', 'despise',
+        'atrocious', 'appalling', 'dreadful', 'abysmal', 'catastrophic', 'disastrous', 'nightmare',
+        'garbage', 'trash', 'worthless', 'useless', 'hopeless', 'devastating', 'crushing',
+        // Social media strong negative
+        'cringe', 'yikes', 'oof', 'rip', 'dead', 'cancelled', 'toxic', 'sus'
+      ],
+      
+      // Moderate negative (weight: -2)
+      moderateNegative: [
+        'bad', 'poor', 'disappointing', 'frustrating', 'annoying', 'boring', 'dull', 'stupid',
+        'ridiculous', 'silly', 'pointless', 'waste', 'problem', 'issue', 'concern', 'worry',
+        'sad', 'angry', 'upset', 'mad', 'confused', 'lost', 'stuck', 'failed', 'wrong',
+        // Social media moderate negative
+        'meh', 'nah', 'cap', 'fake', 'mid', 'basic', 'cringe', 'awkward'
+      ],
+      
+      // Mild negative (weight: -1)
+      mildNegative: [
+        'whatever', 'meh', 'okay', 'fine', 'could be better', 'not great', 'not good',
+        'lacking', 'missing', 'weak', 'slow', 'difficult', 'hard', 'challenge', 'struggle',
+        // Social media mild negative
+        'bruh', 'smh', 'facepalm', 'sigh', 'ugh', 'tired', 'done', 'over it'
+      ]
+    };
 
     const words = text.toLowerCase().split(/\s+/);
-    let positiveScore = 0;
-    let negativeScore = 0;
-
+    let totalScore = 0;
+    let sentimentWordCount = 0;
+    
+    // Analyze each word with weighted scoring
     words.forEach(word => {
       const cleanWord = word.replace(/[^\w]/g, '');
-      if (positiveWords.includes(cleanWord)) positiveScore++;
-      if (negativeWords.includes(cleanWord)) negativeScore++;
+      
+      if (sentimentLexicon.strongPositive.includes(cleanWord)) {
+        totalScore += 3;
+        sentimentWordCount++;
+      } else if (sentimentLexicon.moderatePositive.includes(cleanWord)) {
+        totalScore += 2;
+        sentimentWordCount++;
+      } else if (sentimentLexicon.mildPositive.includes(cleanWord)) {
+        totalScore += 1;
+        sentimentWordCount++;
+      } else if (sentimentLexicon.strongNegative.includes(cleanWord)) {
+        totalScore -= 3;
+        sentimentWordCount++;
+      } else if (sentimentLexicon.moderateNegative.includes(cleanWord)) {
+        totalScore -= 2;
+        sentimentWordCount++;
+      } else if (sentimentLexicon.mildNegative.includes(cleanWord)) {
+        totalScore -= 1;
+        sentimentWordCount++;
+      }
     });
 
-    const totalSentimentWords = positiveScore + negativeScore;
-    const totalWords = words.length;
+    // Check for contextual patterns
+    const textLower = text.toLowerCase();
     
-    // Calculate percentage scores
-    const positivePercentage = totalWords > 0 ? Math.round((positiveScore / totalWords) * 100) : 0;
-    const negativePercentage = totalWords > 0 ? Math.round((negativeScore / totalWords) * 100) : 0;
-    const neutralPercentage = Math.max(0, 100 - positivePercentage - negativePercentage);
+    // Boost for enthusiasm markers
+    if (/!{2,}/.test(text)) totalScore += 1;
+    if (/[A-Z]{3,}/.test(text)) totalScore += 0.5; // ALL CAPS words
+    if (/very|really|so|super|extremely/.test(textLower)) totalScore += (totalScore > 0 ? 1 : -1);
+    
+    // Detect negation patterns
+    if (/not|never|don't|doesn't|didn't|won't|can't|shouldn't/.test(textLower)) {
+      totalScore *= -0.5; // Reverse and weaken sentiment
+    }
+    
+    // Social media specific patterns
+    if (/no cap|for real|periodt/.test(textLower)) totalScore += 0.5;
+    if (/whatever|meh|bruh/.test(textLower)) totalScore -= 0.5;
+    
+    // Calculate percentages with improved distribution
+    const maxPossibleScore = words.length * 3; // Theoretical maximum
+    const normalizedScore = totalScore / Math.max(1, maxPossibleScore);
+    
+    let positivePercentage, neutralPercentage, negativePercentage;
+    
+    if (totalScore > 1) {
+      // Strong positive sentiment
+      positivePercentage = Math.min(85, 50 + (normalizedScore * 35));
+      negativePercentage = Math.max(5, 15 - (normalizedScore * 10));
+      neutralPercentage = 100 - positivePercentage - negativePercentage;
+    } else if (totalScore < -1) {
+      // Strong negative sentiment  
+      negativePercentage = Math.min(85, 50 + (Math.abs(normalizedScore) * 35));
+      positivePercentage = Math.max(5, 15 - (Math.abs(normalizedScore) * 10));
+      neutralPercentage = 100 - positivePercentage - negativePercentage;
+    } else if (totalScore > 0) {
+      // Mild positive
+      positivePercentage = Math.min(70, 35 + (normalizedScore * 25));
+      negativePercentage = Math.max(10, 20 - (normalizedScore * 10));
+      neutralPercentage = 100 - positivePercentage - negativePercentage;
+    } else if (totalScore < 0) {
+      // Mild negative
+      negativePercentage = Math.min(70, 35 + (Math.abs(normalizedScore) * 25));
+      positivePercentage = Math.max(10, 20 - (Math.abs(normalizedScore) * 10));
+      neutralPercentage = 100 - positivePercentage - negativePercentage;
+    } else {
+      // Truly neutral
+      neutralPercentage = 60;
+      positivePercentage = 20;
+      negativePercentage = 20;
+    }
     
     // Determine dominant sentiment
     let dominantSentiment = 'NEUTRAL';
@@ -297,15 +400,20 @@ Text to analyze: "${text}"`;
       dominantSentiment = 'NEGATIVE';
     }
     
-    const confidence = totalSentimentWords > 0 ? Math.min(95, 60 + (totalSentimentWords * 10)) : 60;
+    // Calculate confidence based on sentiment word density and score strength
+    const sentimentDensity = sentimentWordCount / Math.max(1, words.length);
+    const baseConfidence = 60;
+    const densityBonus = sentimentDensity * 20;
+    const strengthBonus = Math.abs(totalScore) * 5;
+    const confidence = Math.min(90, Math.max(60, baseConfidence + densityBonus + strengthBonus));
 
     return {
       sentiment: dominantSentiment,
-      confidence,
+      confidence: Math.round(confidence),
       scores: {
-        positive: positivePercentage,
-        neutral: neutralPercentage,
-        negative: negativePercentage
+        positive: Math.round(positivePercentage),
+        neutral: Math.round(neutralPercentage),
+        negative: Math.round(negativePercentage)
       }
     };
   }
