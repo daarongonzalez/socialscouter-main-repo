@@ -99,6 +99,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- June 28, 2025: Major sentiment analysis improvements
+  - Made OpenAI primary sentiment analysis engine (previously AWS Comprehend)
+  - Enhanced prompting with social media specialization for TikTok/Instagram/YouTube content
+  - Added social media text preprocessing (converts slang like "fire", "lowkey", "periodt")
+  - Dramatically improved local fallback analysis with weighted sentiment lexicon
+  - Results now show balanced sentiment scores instead of 90%+ neutral bias
+  - System correctly detects nuanced emotions in Gen Z/millennial communication patterns
+
 - June 28, 2025: Authentication bypassed for demo mode
   - Removed Firebase authentication requirements from frontend routing
   - Created anonymous user in database for demo functionality

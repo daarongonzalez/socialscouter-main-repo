@@ -26,7 +26,7 @@ async function testSentimentAnalysis() {
       console.log(`→ Positive: ${result.scores?.positive}%, Neutral: ${result.scores?.neutral}%, Negative: ${result.scores?.negative}%`);
       console.log('');
     } catch (error) {
-      console.error(`Error: ${error.message}`);
+      console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       console.log('');
     }
   }
