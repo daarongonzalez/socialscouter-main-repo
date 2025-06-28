@@ -46,25 +46,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Auth routes with Firebase
+  // Auth routes (returns demo user data)
   app.get('/api/auth/user', async (req: any, res) => {
-    try {
-      const authHeader = req.headers.authorization;
-      
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'No token provided' });
-      }
-
-      const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
-      
-      // Use middleware to authenticate and get user
-      authenticateFirebaseToken(req, res, () => {
-        res.json(req.user);
-      });
-    } catch (error) {
-      console.error('Auth error:', error);
-      res.status(401).json({ error: 'Authentication failed' });
-    }
+    res.json({
+      id: "anonymous",
+      email: "demo@socialscouter.ai",
+      name: "Demo User",
+      isDemo: true
+    });
   });
 
   // Health check endpoint
@@ -93,17 +82,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestBody = analyzeVideosSchema.parse(req.body);
       const userId = "anonymous"; // Use anonymous user for demo
 
-      // Skip user limits check for demo mode
-      const limitCheck = { canProceed: true, currentUsage: { monthlyVideoCount: 0, remainingVideos: 999 }, planLimits: { maxBatchSize: 50, monthlyVideoLimit: 1000 } };
-      if (!limitCheck.canProceed) {
-        return res.status(403).json({
-          error: "Usage limit exceeded",
-          message: "Demo mode limit reached",
-          currentUsage: limitCheck.currentUsage,
-          planLimits: limitCheck.planLimits
-        });
-      }
-
       // Create batch analysis record
       const batch = await storage.createBatchAnalysis({
         userId,
@@ -115,114 +93,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentimentCounts: JSON.stringify({ POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 })
       });
 
-        // Process each URL
-        const results: any[] = [];
-        let totalWords = 0;
-        let totalConfidence = 0;
-        const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
-        const sentimentScores = { positive: 0, neutral: 0, negative: 0 };
+      // Process each URL
+      const results: any[] = [];
+      let totalWords = 0;
+      let totalConfidence = 0;
+      const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+      const sentimentScores = { positive: 0, neutral: 0, negative: 0 };
 
-        for (const url of requestBody.urls) {
-          const sanitizedUrl = InputSanitizer.sanitizeUrl(url);
+      for (const url of requestBody.urls) {
+        const sanitizedUrl = InputSanitizer.sanitizeUrl(url);
+        
+        try {
+          // Get transcript
+          const transcript = await transcriptService.getTranscript(sanitizedUrl, requestBody.contentType);
           
-          try {
-            // Get transcript
-            const transcript = await transcriptService.getTranscript(sanitizedUrl, requestBody.contentType);
-            
-            if (!transcript) {
-              results.push({
-                url: sanitizedUrl,
-                transcript: null,
-                sentiment: 'NEUTRAL',
-                confidence: 0,
-                scores: { positive: 0, neutral: 1, negative: 0 },
-                error: 'Could not extract transcript'
-              });
-              continue;
-            }
-
-            // Analyze sentiment
-            const sentimentResult = await sentimentService.analyzeSentiment(transcript);
-            
-            // Create analysis result
-            const analysisResult = await storage.createAnalysisResult({
-              batchId: batch.id,
-              url: sanitizedUrl,
-              platform: requestBody.contentType,
-              transcript: InputSanitizer.sanitizeText(transcript),
-              sentiment: sentimentResult.sentiment,
-              confidence: sentimentResult.confidence,
-              wordCount: transcript.split(' ').length,
-              sentimentScores: JSON.stringify(sentimentResult.scores || {})
-            });
-
-            results.push(analysisResult);
-            totalWords += transcript.split(' ').length;
-            totalConfidence += sentimentResult.confidence;
-            
-            // Count sentiments
-            sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
-            
-            // Aggregate scores
-            if (sentimentResult.scores) {
-              sentimentScores.positive += sentimentResult.scores.positive;
-              sentimentScores.neutral += sentimentResult.scores.neutral;
-              sentimentScores.negative += sentimentResult.scores.negative;
-            }
-          } catch (error) {
-            console.error(`Error processing URL ${sanitizedUrl}:`, error);
+          if (!transcript) {
             results.push({
               url: sanitizedUrl,
-              transcript: null,
-              sentiment: 'NEUTRAL',
-              confidence: 0,
-              scores: { positive: 0, neutral: 1, negative: 0 },
-              error: 'Processing failed'
+              platform: requestBody.contentType,
+              sentiment: "NEUTRAL",
+              confidence: 0.5,
+              transcript: "No transcript available",
+              wordCount: 0,
+              sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
             });
+            continue;
           }
-        }
 
-        // Record usage
-        await planLimitsService.recordVideoUsage(userId, requestBody.urls.length);
+          // Analyze sentiment
+          const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+          
+          // Create analysis result
+          const analysisResult = await storage.createAnalysisResult({
+            batchId: batch.id,
+            url: sanitizedUrl,
+            platform: requestBody.contentType,
+            transcript: InputSanitizer.sanitizeText(transcript),
+            sentiment: sentimentResult.sentiment,
+            confidence: sentimentResult.confidence,
+            wordCount: transcript.split(' ').length,
+            sentimentScores: JSON.stringify(sentimentResult.scores || {})
+          });
 
-        // Calculate averages
-        const totalVideos = results.length;
-        const avgConfidence = totalVideos > 0 ? totalConfidence / totalVideos : 0;
-        const processingTime = Date.now() - startTime;
-
-        // Normalize sentiment scores
-        const totalScore = sentimentScores.positive + sentimentScores.neutral + sentimentScores.negative;
-        if (totalScore > 0) {
-          sentimentScores.positive = sentimentScores.positive / totalScore;
-          sentimentScores.neutral = sentimentScores.neutral / totalScore;
-          sentimentScores.negative = sentimentScores.negative / totalScore;
-        }
-
-        const response: AnalyzeVideosResponse = {
-          batchId: batch.id,
-          results,
-          summary: {
-            totalVideos,
-            totalWords,
-            avgConfidence,
-            processingTime,
-            sentimentCounts,
-            sentimentScores
+          results.push(analysisResult);
+          totalWords += transcript.split(' ').length;
+          totalConfidence += sentimentResult.confidence;
+          
+          // Count sentiments
+          sentimentCounts[sentimentResult.sentiment as keyof typeof sentimentCounts]++;
+          
+          // Aggregate scores
+          if (sentimentResult.scores) {
+            sentimentScores.positive += sentimentResult.scores.positive;
+            sentimentScores.neutral += sentimentResult.scores.neutral;
+            sentimentScores.negative += sentimentResult.scores.negative;
           }
-        };
-
-        res.json(response);
-      } catch (error) {
-        console.error("Analysis error:", error);
-        if (error instanceof ZodError) {
-          return res.status(400).json({
-            error: "Invalid request data",
-            details: error.errors
+        } catch (error) {
+          console.error(`Error processing URL ${sanitizedUrl}:`, error);
+          results.push({
+            url: sanitizedUrl,
+            platform: requestBody.contentType,
+            sentiment: "NEUTRAL",
+            confidence: 0.5,
+            transcript: "Error processing video",
+            wordCount: 0,
+            sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
           });
         }
-        res.status(500).json({ error: "Internal server error" });
       }
-    });
+
+      // Calculate averages
+      const totalVideos = results.length;
+      const avgConfidence = totalVideos > 0 ? totalConfidence / totalVideos : 0;
+      const processingTime = Date.now() - startTime;
+
+      // Normalize sentiment scores
+      const totalScore = sentimentScores.positive + sentimentScores.neutral + sentimentScores.negative;
+      if (totalScore > 0) {
+        sentimentScores.positive = sentimentScores.positive / totalScore;
+        sentimentScores.neutral = sentimentScores.neutral / totalScore;
+        sentimentScores.negative = sentimentScores.negative / totalScore;
+      }
+
+      const response: AnalyzeVideosResponse = {
+        batchId: batch.id,
+        results,
+        summary: {
+          totalVideos,
+          totalWords,
+          avgConfidence,
+          processingTime,
+          sentimentCounts,
+          sentimentScores
+        }
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Analysis error:", error);
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          error: "Invalid request data",
+          details: error.errors
+        });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   // Get batch analysis results (authentication bypassed)
@@ -254,137 +230,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user plan information and usage with Firebase auth
+  // Get user plan information and usage (authentication bypassed)
   app.get("/api/user/plan", async (req: any, res) => {
-    const { authenticateFirebaseToken } = await import('./lib/auth-middleware');
-    
-    authenticateFirebaseToken(req, res, async () => {
-      try {
-        const planInfo = await planLimitsService.getUserPlanInfo(req.user.id);
-        res.json(planInfo);
-      } catch (error) {
-        console.error("Plan info retrieval error:", error);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    });
+    try {
+      const planInfo = {
+        planType: "demo",
+        planLimits: {
+          maxBatchSize: 10,
+          monthlyVideoLimit: 100
+        },
+        currentUsage: {
+          monthlyVideoCount: 0,
+          remainingVideos: 100,
+          lastResetDate: new Date().toISOString()
+        },
+        subscriptionStatus: "demo"
+      };
+      res.json(planInfo);
+    } catch (error) {
+      console.error("Plan info retrieval error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
-  // Stripe subscription routes - temporarily disabled during auth provider migration
+  // Stripe subscription routes - disabled for demo
   app.post('/api/create-subscription', async (req: any, res) => {
-    // TODO: Replace with new authentication provider
-    res.status(401).json({ error: "Authentication required", message: "Please sign in to create subscription" });
+    res.status(401).json({ error: "Demo mode", message: "Subscription features disabled in demo mode" });
   });
 
   // Stripe webhook endpoint (must be before JSON body parsing middleware)
   app.post('/api/stripe/webhook', async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-    let event: Stripe.Event;
-
-    try {
-      // Verify webhook signature
-      if (!process.env.STRIPE_WEBHOOK_SECRET) {
-        console.error('Missing STRIPE_WEBHOOK_SECRET environment variable');
-        return res.status(400).send('Webhook secret not configured');
-      }
-
-      event = stripe.webhooks.constructEvent(req.body, sig as string, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    try {
-      console.log(`Received Stripe webhook event: ${event.type}`);
-      
-      switch (event.type) {
-        case 'customer.subscription.created':
-        case 'customer.subscription.updated':
-          console.log(`Processing subscription event: ${event.type}`);
-          await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
-          break;
-        
-        case 'customer.subscription.deleted':
-          console.log(`Processing subscription deletion`);
-          await handleSubscriptionCanceled(event.data.object as Stripe.Subscription);
-          break;
-        
-        case 'invoice.payment_succeeded':
-          console.log(`Processing payment success`);
-          await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
-          break;
-        
-        case 'invoice.payment_failed':
-          console.log(`Processing payment failure`);
-          await handlePaymentFailed(event.data.object as Stripe.Invoice);
-          break;
-        
-        default:
-          console.log(`Unhandled event type: ${event.type}`);
-      }
-
-      console.log(`Successfully processed webhook event: ${event.type}`);
-      res.json({ received: true });
-    } catch (error: any) {
-      console.error('Error processing webhook:', error);
-      res.status(500).json({ error: 'Webhook processing failed' });
-    }
+    res.status(200).json({ received: true });
   });
 
-  // Webhook event handlers
-  async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
-    try {
-      const customerId = subscription.customer as string;
-      const priceId = subscription.items.data[0]?.price.id;
-      const planName = getPlanFromPriceId(priceId || '');
-      
-      if (planName) {
-        await storage.updateUserSubscription(
-          customerId,
-          subscription.status,
-          planName
-        );
-        console.log(`Updated subscription for customer ${customerId}: ${planName} (${subscription.status})`);
-      }
-    } catch (error) {
-      console.error('Error handling subscription update:', error);
-      throw error;
-    }
-  }
-
-  async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
-    try {
-      const customerId = subscription.customer as string;
-      await storage.updateUserSubscription(customerId, 'canceled');
-      console.log(`Canceled subscription for customer ${customerId}`);
-    } catch (error) {
-      console.error('Error handling subscription cancellation:', error);
-      throw error;
-    }
-  }
-
-  async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-    try {
-      const customerId = invoice.customer as string;
-      console.log(`Payment succeeded for customer ${customerId}`);
-      // Additional payment success logic can be added here
-    } catch (error) {
-      console.error('Error handling payment success:', error);
-      throw error;
-    }
-  }
-
-  async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    try {
-      const customerId = invoice.customer as string;
-      console.log(`Payment failed for customer ${customerId}`);
-      // Additional payment failure logic can be added here
-    } catch (error) {
-      console.error('Error handling payment failure:', error);
-      throw error;
-    }
-  }
-
-  const httpServer = createServer(app);
-  return httpServer;
+  const server = createServer(app);
+  return server;
 }
