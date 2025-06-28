@@ -82,10 +82,15 @@ app.use('/api/analyze', analysisLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// CSRF protection for all routes except webhooks
+// CSRF protection for all routes except webhooks and demo mode
 app.use((req, res, next) => {
-  // Skip CSRF for webhooks and health checks
-  if (req.path.startsWith('/api/stripe/webhook') || req.path === '/api/health') {
+  // Skip CSRF for webhooks, health checks, and demo endpoints
+  if (req.path.startsWith('/api/stripe/webhook') || 
+      req.path === '/api/health' || 
+      req.path === '/api/analyze' ||
+      req.path === '/api/history' ||
+      req.path === '/api/user/plan' ||
+      req.path.startsWith('/api/batch/')) {
     return next();
   }
   csrfMiddleware(req, res, next);

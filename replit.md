@@ -99,6 +99,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- June 28, 2025: Authentication bypassed for demo mode
+  - Removed Firebase authentication requirements from frontend routing
+  - Created anonymous user in database for demo functionality
+  - Disabled CSRF protection for analysis endpoints
+  - All core features now accessible without login at app.socialscouter.ai
+  - Video sentiment analysis fully functional in demo mode
+
 - June 25, 2025: Firebase Authentication integration completed
   - Replaced Replit Auth with Firebase Auth using Google OAuth
   - Updated frontend to use Firebase SDK for authentication flow
