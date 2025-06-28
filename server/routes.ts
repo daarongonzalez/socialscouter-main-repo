@@ -234,17 +234,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/user/plan", async (req: any, res) => {
     try {
       const planInfo = {
-        planType: "demo",
+        planType: "business",
         planLimits: {
-          maxBatchSize: 10,
-          monthlyVideoLimit: 100
+          maxBatchSize: 25,
+          monthlyVideoLimit: 500
         },
         currentUsage: {
-          monthlyVideoCount: 0,
-          remainingVideos: 100,
-          lastResetDate: new Date().toISOString()
+          monthlyVideoCount: 147,
+          remainingVideos: 353,
+          lastResetDate: "2024-12-01T00:00:00.000Z"
         },
-        subscriptionStatus: "demo"
+        subscriptionStatus: "active"
       };
       res.json(planInfo);
     } catch (error) {
