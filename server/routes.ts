@@ -167,12 +167,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const avgConfidence = totalVideos > 0 ? totalConfidence / totalVideos : 0;
       const processingTime = Date.now() - startTime;
 
-      // Normalize sentiment scores
-      const totalScore = sentimentScores.positive + sentimentScores.neutral + sentimentScores.negative;
-      if (totalScore > 0) {
-        sentimentScores.positive = sentimentScores.positive / totalScore;
-        sentimentScores.neutral = sentimentScores.neutral / totalScore;
-        sentimentScores.negative = sentimentScores.negative / totalScore;
+      // Calculate average sentiment scores across all videos
+      if (totalVideos > 0) {
+        sentimentScores.positive = sentimentScores.positive / totalVideos;
+        sentimentScores.neutral = sentimentScores.neutral / totalVideos;
+        sentimentScores.negative = sentimentScores.negative / totalVideos;
       }
 
       const response: AnalyzeVideosResponse = {
