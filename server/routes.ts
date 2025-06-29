@@ -144,9 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Aggregate scores
           if (sentimentResult.scores) {
+            console.log(`Video sentiment scores: pos=${sentimentResult.scores.positive}, neu=${sentimentResult.scores.neutral}, neg=${sentimentResult.scores.negative}`);
             sentimentScores.positive += sentimentResult.scores.positive;
             sentimentScores.neutral += sentimentResult.scores.neutral;
             sentimentScores.negative += sentimentResult.scores.negative;
+            console.log(`Running totals: pos=${sentimentScores.positive}, neu=${sentimentScores.neutral}, neg=${sentimentScores.negative}`);
           }
         } catch (error) {
           console.error(`Error processing URL ${sanitizedUrl}:`, error);
@@ -168,11 +170,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const processingTime = Date.now() - startTime;
 
       // Calculate average sentiment scores across all videos
+      console.log(`Before averaging - Total videos: ${totalVideos}, Raw totals: pos=${sentimentScores.positive}, neu=${sentimentScores.neutral}, neg=${sentimentScores.negative}`);
       if (totalVideos > 0) {
         sentimentScores.positive = sentimentScores.positive / totalVideos;
         sentimentScores.neutral = sentimentScores.neutral / totalVideos;
         sentimentScores.negative = sentimentScores.negative / totalVideos;
       }
+      console.log(`After averaging: pos=${sentimentScores.positive}, neu=${sentimentScores.neutral}, neg=${sentimentScores.negative}`);
 
       const response: AnalyzeVideosResponse = {
         batchId: batch.id,
