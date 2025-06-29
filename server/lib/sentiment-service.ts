@@ -437,7 +437,7 @@ Text to analyze: "${text}"`;
       const maxScore = Math.max(scores.Positive, scores.Negative, scores.Neutral, scores.Mixed || 0);
       totalConfidence += maxScore * 100;
       
-      // Aggregate percentage scores
+      // Aggregate percentage scores (AWS returns 0-1, convert to 0-100)
       totalPositive += scores.Positive * 100;
       totalNeutral += scores.Neutral * 100;
       totalNegative += scores.Negative * 100;

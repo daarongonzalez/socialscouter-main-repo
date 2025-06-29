@@ -99,6 +99,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- June 29, 2025: Fixed sentiment score averaging calculation
+  - Resolved issue where Average Score cards displayed tiny decimals (0.5%) instead of meaningful percentages
+  - Fixed scale mismatch between sentiment analysis (percentages 0-100) and aggregation logic
+  - Average scores now correctly show mean sentiment across all videos in batch (e.g., 60% positive)
+  - Calculation: sum individual video scores → divide by video count → display as percentages
+  - Database stores individual scores as JSON, API returns proper batch averages
+
 - June 28, 2025: Major sentiment analysis improvements
   - Made OpenAI primary sentiment analysis engine (previously AWS Comprehend)
   - Enhanced prompting with social media specialization for TikTok/Instagram/YouTube content
