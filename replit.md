@@ -114,12 +114,13 @@ Preferred communication style: Simple, everyday language.
   - Results now show balanced sentiment scores instead of 90%+ neutral bias
   - System correctly detects nuanced emotions in Gen Z/millennial communication patterns
 
-- June 28, 2025: Authentication bypassed for demo mode
-  - Removed Firebase authentication requirements from frontend routing
-  - Created anonymous user in database for demo functionality
-  - Disabled CSRF protection for analysis endpoints
-  - All core features now accessible without login at app.socialscouter.ai
-  - Video sentiment analysis fully functional in demo mode
+- July 14, 2025: Authentication system activated (demo mode removed)
+  - Removed all anonymous user demo overrides from backend routes
+  - Added Firebase authentication middleware to all API endpoints
+  - Implemented user-specific data isolation for history and analysis
+  - Re-enabled CSRF protection for all state-changing operations
+  - Added protected route guards to frontend pages
+  - Users now required to authenticate to access sentiment analysis features
 
 - June 25, 2025: Firebase Authentication integration completed
   - Replaced Replit Auth with Firebase Auth using Google OAuth
