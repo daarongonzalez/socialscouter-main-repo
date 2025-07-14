@@ -10,6 +10,7 @@ import { getSession } from "./session";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
 import { getCsrfToken } from "./lib/csrf-middleware";
+import { authenticateFirebaseToken, type AuthenticatedRequest } from "./lib/auth-middleware";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -39,6 +40,29 @@ function getPlanFromPriceId(priceId: string): string | null {
   return priceToPlans[priceId] || null;
 }
 
+function getPriceIdForPlan(plan: string, isYearly: boolean): string | null {
+  // Map plan names to Stripe price IDs
+  const planToPrices: { [key: string]: { monthly: string; yearly: string } } = {
+    starter: {
+      monthly: 'price_1RVfTT2MTD7ADXrKJFfxbBpF',
+      yearly: 'price_1RW6gp2MTD7ADXrKajpegBna'
+    },
+    business: {
+      monthly: 'price_1RVfZ02MTD7ADXrK9BhHfTCb',
+      yearly: 'price_1RW6jA2MTD7ADXrKJppgZcP1'
+    },
+    enterprise: {
+      monthly: 'price_1RW6de2MTD7ADXrKSbM0Iz6B',
+      yearly: 'price_1RW6kz2MTD7ADXrKVxkkKteC'
+    }
+  };
+  
+  const prices = planToPrices[plan];
+  if (!prices) return null;
+  
+  return isYearly ? prices.yearly : prices.monthly;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware for CSRF and state management
   app.use(getSession());
@@ -46,13 +70,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const transcriptService = new TranscriptService();
   const sentimentService = new SentimentService();
 
-  // Auth routes (returns demo user data)
-  app.get('/api/auth/user', async (req: any, res) => {
+  // Auth routes (requires authentication)
+  app.get('/api/auth/user', authenticateFirebaseToken, async (req: any, res) => {
     res.json({
-      id: "anonymous",
-      email: "demo@socialscouter.ai",
-      name: "Demo User",
-      isDemo: true
+      id: req.user.id,
+      email: req.user.email,
+      name: `${req.user.firstName} ${req.user.lastName}`.trim(),
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      profileImageUrl: req.user.profileImageUrl,
+      isDemo: false
     });
   });
 
@@ -67,8 +94,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: token });
   });
 
-  // Analyze videos endpoint (authentication bypassed)
-  app.post("/api/analyze", async (req: any, res) => {
+  // Analyze videos endpoint (requires authentication)
+  app.post("/api/analyze", authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validationErrors = validationResult(req);
       if (!validationErrors.isEmpty()) {
@@ -80,7 +107,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const startTime = Date.now();
       const requestBody = analyzeVideosSchema.parse(req.body);
-      const userId = "anonymous"; // Use anonymous user for demo
+      const userId = req.user.id; // Use authenticated user ID
+
+      // Check user limits before processing
+      const limitCheck = await planLimitsService.checkUserLimits(userId, requestBody.urls.length);
+      if (!limitCheck.canProceed) {
+        return res.status(403).json({
+          error: "Usage limit exceeded",
+          message: limitCheck.errorMessage,
+          currentUsage: limitCheck.currentUsage,
+          planLimits: limitCheck.planLimits
+        });
+      }
 
       // Create batch analysis record
       const batch = await storage.createBatchAnalysis({
@@ -174,6 +212,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentimentScores.negative = sentimentScores.negative / totalVideos;
       }
 
+      // Record video usage for the user
+      await planLimitsService.recordVideoUsage(userId, totalVideos);
+
       const response: AnalyzeVideosResponse = {
         batchId: batch.id,
         results,
@@ -200,405 +241,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get batch analysis results (authentication bypassed)
-  app.get("/api/batch/:id", async (req: any, res) => {
+  // Get batch analysis results (requires authentication)
+  app.get("/api/batch/:id", authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
     try {
       const batchId = InputSanitizer.validateBatchId(req.params.id);
       
-      // Handle dummy batch data
-      if (batchId === 999) {
-        const dummyBatch = {
-          id: 999,
-          userId: "anonymous",
-          contentType: "tiktok",
-          totalVideos: 5,
-          totalWords: 1250,
-          avgConfidence: 85,
-          processingTime: 12.5,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 65,
-            NEUTRAL: 25,
-            NEGATIVE: 10
-          }),
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
-        };
-        
-        const dummyResults = [
-          {
-            id: 9991,
-            url: "https://www.tiktok.com/@foodie_life/video/7203152757287816494",
-            platform: "tiktok",
-            sentiment: "POSITIVE",
-            confidence: 88,
-            transcript: "This recipe is absolutely amazing! The flavors are incredible and so easy to make. Everyone should try this at home!",
-            wordCount: 142,
-            sentimentScores: JSON.stringify({
-              positive: 78,
-              neutral: 15,
-              negative: 7
-            }),
-            commonPositivePhrases: ["absolutely amazing", "incredible flavors", "everyone should try"],
-            commonNegativePhrases: ["too complicated", "expensive ingredients"],
-            batchId: 999,
-            createdAt: new Date()
-          },
-          {
-            id: 9992,
-            url: "https://www.tiktok.com/@travel_guru/video/7205660792853630214",
-            platform: "tiktok",
-            sentiment: "POSITIVE",
-            confidence: 92,
-            transcript: "Best vacation spot ever! Crystal clear waters, friendly locals, and unforgettable experiences. Highly recommend!",
-            wordCount: 89,
-            sentimentScores: JSON.stringify({
-              positive: 85,
-              neutral: 10,
-              negative: 5
-            }),
-            commonPositivePhrases: ["best vacation spot", "highly recommend", "unforgettable experiences"],
-            commonNegativePhrases: ["crowded beaches", "overpriced"],
-            batchId: 999,
-            createdAt: new Date()
-          },
-          {
-            id: 9993,
-            url: "https://www.tiktok.com/@tech_reviews/video/7203787386097241390",
-            platform: "tiktok",
-            sentiment: "NEUTRAL",
-            confidence: 75,
-            transcript: "This phone has decent battery life and good camera quality. The price is reasonable for what you get. Could be better though.",
-            wordCount: 156,
-            sentimentScores: JSON.stringify({
-              positive: 45,
-              neutral: 40,
-              negative: 15
-            }),
-            commonPositivePhrases: ["decent battery life", "good camera quality", "reasonable price"],
-            commonNegativePhrases: ["could be better", "not impressive", "limited features"],
-            batchId: 999,
-            createdAt: new Date()
-          },
-          {
-            id: 9994,
-            url: "https://www.tiktok.com/@fitness_coach/video/7341421020722613546",
-            platform: "tiktok",
-            sentiment: "POSITIVE",
-            confidence: 83,
-            transcript: "Love this workout routine! Gets your heart pumping and builds strength. Perfect for beginners and advanced users alike.",
-            wordCount: 98,
-            sentimentScores: JSON.stringify({
-              positive: 72,
-              neutral: 20,
-              negative: 8
-            }),
-            commonPositivePhrases: ["love this workout", "perfect for beginners", "builds strength"],
-            commonNegativePhrases: ["too intense", "hard to follow"],
-            batchId: 999,
-            createdAt: new Date()
-          },
-          {
-            id: 9995,
-            url: "https://www.tiktok.com/@music_lover/video/7298765432109876543",
-            platform: "tiktok",
-            sentiment: "NEGATIVE",
-            confidence: 79,
-            transcript: "This song is disappointing. The lyrics are confusing and the beat doesn't match the vibe. Not worth listening to.",
-            wordCount: 112,
-            sentimentScores: JSON.stringify({
-              positive: 15,
-              neutral: 25,
-              negative: 60
-            }),
-            commonPositivePhrases: ["catchy melody", "good vocals"],
-            commonNegativePhrases: ["disappointing", "confusing lyrics", "not worth listening"],
-            batchId: 999,
-            createdAt: new Date()
-          }
-        ];
-        
-        return res.json({ batch: dummyBatch, results: dummyResults });
-      }
-      
-      if (batchId === 998) {
-        const dummyBatch = {
-          id: 998,
-          userId: "anonymous",
-          contentType: "reels",
-          totalVideos: 3,
-          totalWords: 890,
-          avgConfidence: 92,
-          processingTime: 8.2,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 75,
-            NEUTRAL: 15,
-            NEGATIVE: 10
-          }),
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-        };
-        
-        const dummyResults = [
-          {
-            id: 9981,
-            url: "https://www.instagram.com/p/CpQrS9tOxYz/",
-            platform: "reels",
-            sentiment: "POSITIVE",
-            confidence: 94,
-            transcript: "Stunning sunset photography! The colors are breathtaking and the composition is perfect. This is art!",
-            wordCount: 134,
-            sentimentScores: JSON.stringify({
-              positive: 82,
-              neutral: 13,
-              negative: 5
-            }),
-            commonPositivePhrases: ["stunning photography", "breathtaking colors", "perfect composition"],
-            commonNegativePhrases: ["overexposed", "too filtered"],
-            batchId: 998,
-            createdAt: new Date()
-          },
-          {
-            id: 9982,
-            url: "https://www.instagram.com/p/CpRtU0vPzAb/",
-            platform: "reels",
-            sentiment: "POSITIVE",
-            confidence: 88,
-            transcript: "Amazing dance moves! The choreography is on point and the energy is infectious. Keep it up!",
-            wordCount: 87,
-            sentimentScores: JSON.stringify({
-              positive: 76,
-              neutral: 18,
-              negative: 6
-            }),
-            commonPositivePhrases: ["amazing dance moves", "on point", "infectious energy"],
-            commonNegativePhrases: ["off beat", "needs practice"],
-            batchId: 998,
-            createdAt: new Date()
-          },
-          {
-            id: 9983,
-            url: "https://www.instagram.com/p/CpStV1wQcDe/",
-            platform: "reels",
-            sentiment: "POSITIVE",
-            confidence: 91,
-            transcript: "Delicious looking dessert! The presentation is beautiful and I bet it tastes as good as it looks. Recipe please!",
-            wordCount: 156,
-            sentimentScores: JSON.stringify({
-              positive: 79,
-              neutral: 16,
-              negative: 5
-            }),
-            commonPositivePhrases: ["delicious looking", "beautiful presentation", "tastes good"],
-            commonNegativePhrases: ["too sweet", "complicated recipe"],
-            batchId: 998,
-            createdAt: new Date()
-          }
-        ];
-        
-        return res.json({ batch: dummyBatch, results: dummyResults });
-      }
-      
-      if (batchId === 997) {
-        const dummyBatch = {
-          id: 997,
-          userId: "anonymous",
-          contentType: "shorts",
-          totalVideos: 4,
-          totalWords: 1120,
-          avgConfidence: 78,
-          processingTime: 15.7,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 45,
-            NEUTRAL: 35,
-            NEGATIVE: 20
-          }),
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        };
-        
-        const dummyResults = [
-          {
-            id: 9971,
-            url: "https://www.youtube.com/shorts/dQw4w9WgXcQ",
-            platform: "shorts",
-            sentiment: "POSITIVE",
-            confidence: 82,
-            transcript: "Great tutorial! Easy to follow steps and helpful tips. This will definitely help me improve my skills.",
-            wordCount: 145,
-            sentimentScores: JSON.stringify({
-              positive: 68,
-              neutral: 25,
-              negative: 7
-            }),
-            commonPositivePhrases: ["great tutorial", "easy to follow", "helpful tips"],
-            commonNegativePhrases: ["too fast", "needs more detail"],
-            batchId: 997,
-            createdAt: new Date()
-          },
-          {
-            id: 9972,
-            url: "https://www.youtube.com/shorts/oHg5SJYRHA0",
-            platform: "shorts",
-            sentiment: "NEUTRAL",
-            confidence: 71,
-            transcript: "This product is okay. It works as described but nothing special. Average quality for the price point.",
-            wordCount: 128,
-            sentimentScores: JSON.stringify({
-              positive: 35,
-              neutral: 50,
-              negative: 15
-            }),
-            commonPositivePhrases: ["works as described", "average quality"],
-            commonNegativePhrases: ["nothing special", "overpriced", "could be better"],
-            batchId: 997,
-            createdAt: new Date()
-          },
-          {
-            id: 9973,
-            url: "https://www.youtube.com/shorts/iik25wqIuFo",
-            platform: "shorts",
-            sentiment: "NEGATIVE",
-            confidence: 85,
-            transcript: "Terrible experience. Poor customer service and the product broke after one week. Would not recommend to anyone.",
-            wordCount: 167,
-            sentimentScores: JSON.stringify({
-              positive: 8,
-              neutral: 22,
-              negative: 70
-            }),
-            commonPositivePhrases: ["quick delivery", "good packaging"],
-            commonNegativePhrases: ["terrible experience", "poor customer service", "would not recommend"],
-            batchId: 997,
-            createdAt: new Date()
-          },
-          {
-            id: 9974,
-            url: "https://www.youtube.com/shorts/xvFZjo5PgG0",
-            platform: "shorts",
-            sentiment: "NEUTRAL",
-            confidence: 76,
-            transcript: "The movie was decent. Some good scenes but overall predictable plot. Worth watching once but not memorable.",
-            wordCount: 198,
-            sentimentScores: JSON.stringify({
-              positive: 40,
-              neutral: 45,
-              negative: 15
-            }),
-            commonPositivePhrases: ["decent movie", "some good scenes", "worth watching"],
-            commonNegativePhrases: ["predictable plot", "not memorable", "disappointing ending"],
-            batchId: 997,
-            createdAt: new Date()
-          }
-        ];
-        
-        return res.json({ batch: dummyBatch, results: dummyResults });
-      }
-      
+      // Get the batch and verify ownership
       const batch = await storage.getBatchAnalysis(batchId);
-      
       if (!batch) {
         return res.status(404).json({ error: "Batch not found" });
       }
       
+      // Check if user owns this batch
+      if (batch.userId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Get analysis results for this batch
       const results = await storage.getAnalysisResultsByBatchId(batchId);
+      
       res.json({ batch, results });
     } catch (error) {
-      console.error("Batch retrieval error:", error);
+      console.error("Error fetching batch:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
-  // Get user's batch analyses for history (authentication bypassed)
-  app.get("/api/history", async (req: any, res) => {
+  // Get user's analysis history (requires authentication)
+  app.get("/api/history", authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const batches = await storage.getUserBatchAnalyses("anonymous");
-      
-      // Add dummy data with meaningful sentiment scores for UI testing
-      const dummyBatches = [
-        {
-          id: 999,
-          userId: "anonymous",
-          contentType: "tiktok",
-          totalVideos: 5,
-          totalWords: 1250,
-          avgConfidence: 85,
-          processingTime: 12.5,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 65,
-            NEUTRAL: 25,
-            NEGATIVE: 10
-          }),
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
-        },
-        {
-          id: 998,
-          userId: "anonymous",
-          contentType: "reels",
-          totalVideos: 3,
-          totalWords: 890,
-          avgConfidence: 92,
-          processingTime: 8.2,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 75,
-            NEUTRAL: 15,
-            NEGATIVE: 10
-          }),
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
-        },
-        {
-          id: 997,
-          userId: "anonymous",
-          contentType: "shorts",
-          totalVideos: 4,
-          totalWords: 1120,
-          avgConfidence: 78,
-          processingTime: 15.7,
-          sentimentCounts: JSON.stringify({
-            POSITIVE: 45,
-            NEUTRAL: 35,
-            NEGATIVE: 20
-          }),
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
-        }
-      ];
-      
-      // Combine real batches with dummy data
-      const allBatches = [...dummyBatches, ...batches];
-      res.json(allBatches);
+      const batches = await storage.getUserBatchAnalyses(req.user.id);
+      res.json(batches);
     } catch (error) {
-      console.error("History retrieval error:", error);
+      console.error("Error fetching history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
-  // Get user plan information and usage (authentication bypassed)
-  app.get("/api/user/plan", async (req: any, res) => {
+  // Get user plan information (requires authentication)
+  app.get("/api/user/plan", authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const planInfo = {
-        planType: "business",
-        planLimits: {
-          maxBatchSize: 25,
-          monthlyVideoLimit: 500
-        },
-        currentUsage: {
-          monthlyVideoCount: 147,
-          remainingVideos: 353,
-          lastResetDate: "2024-12-01T00:00:00.000Z"
-        },
-        subscriptionStatus: "active"
-      };
+      const planInfo = await planLimitsService.getUserPlanInfo(req.user.id);
       res.json(planInfo);
     } catch (error) {
-      console.error("Plan info retrieval error:", error);
+      console.error("Error fetching plan info:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
-  // Stripe subscription routes - disabled for demo
-  app.post('/api/create-subscription', async (req: any, res) => {
-    res.status(401).json({ error: "Demo mode", message: "Subscription features disabled in demo mode" });
+  // Stripe subscription routes (requires authentication)
+  app.post('/api/create-subscription', authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { plan, isYearly } = req.body;
+      
+      // Validate plan
+      if (!plan || !['starter', 'business', 'enterprise'].includes(plan)) {
+        return res.status(400).json({ error: "Invalid plan selected" });
+      }
+      
+      // Get or create Stripe customer
+      let stripeCustomerId = req.user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: req.user.email,
+          name: `${req.user.firstName} ${req.user.lastName}`.trim(),
+          metadata: {
+            userId: req.user.id
+          }
+        });
+        stripeCustomerId = customer.id;
+        
+        // Update user with Stripe customer ID
+        await storage.updateUserStripeInfo(req.user.id, stripeCustomerId, '');
+      }
+      
+      // Create Stripe subscription
+      const priceId = getPriceIdForPlan(plan, isYearly);
+      if (!priceId) {
+        return res.status(400).json({ error: "Invalid plan configuration" });
+      }
+      
+      const subscription = await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: [{ price: priceId }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent']
+      });
+      
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret
+      });
+    } catch (error) {
+      console.error("Subscription creation error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   // Stripe webhook endpoint (must be before JSON body parsing middleware)
   app.post('/api/stripe/webhook', async (req, res) => {
-    res.status(200).json({ received: true });
+    const signature = req.headers['stripe-signature'];
+    
+    if (!signature) {
+      return res.status(400).json({ error: 'No signature provided' });
+    }
+    
+    try {
+      const event = stripe.webhooks.constructEvent(
+        req.body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET!
+      );
+      
+      switch (event.type) {
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+          const subscription = event.data.object;
+          const plan = getPlanFromPriceId(subscription.items.data[0].price.id);
+          
+          if (plan) {
+            await storage.updateUserSubscription(
+              subscription.customer as string,
+              subscription.status,
+              plan
+            );
+          }
+          break;
+          
+        case 'invoice.payment_succeeded':
+          const invoice = event.data.object;
+          // Handle successful payment
+          break;
+          
+        case 'invoice.payment_failed':
+          const failedInvoice = event.data.object;
+          // Handle failed payment
+          break;
+      }
+      
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Webhook error:', error);
+      res.status(400).json({ error: 'Webhook signature verification failed' });
+    }
   });
 
   const server = createServer(app);
