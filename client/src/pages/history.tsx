@@ -10,9 +10,12 @@ export default function HistoryPage() {
     queryFn: async (): Promise<BatchAnalysis[]> => {
       const response = await fetch('/api/history')
       if (!response.ok) throw new Error('Failed to fetch history')
-      return response.json()
+      const data = await response.json()
+      return data
     }
   })
+
+
 
   if (isLoading) {
     return (

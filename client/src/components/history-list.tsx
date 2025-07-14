@@ -16,11 +16,14 @@ interface HistoryListProps {
 export function HistoryList({ batches }: HistoryListProps) {
   const [expandedItems, setExpandedItems] = useState<number[]>([])
 
+
+
   const toggleExpand = (id: number) => {
     setExpandedItems((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
   }
 
   if (!batches || batches.length === 0) {
+
     return (
       <div className="text-center text-neutral-500 py-8">
         <p>No analysis history found. Run your first analysis to see results here.</p>
