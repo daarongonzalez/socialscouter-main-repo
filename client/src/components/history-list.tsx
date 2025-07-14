@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Calendar, ExternalLink } from "lucide-react"
 import { SentimentCircle } from "@/components/sentiment-circle"
+import { HistoryResultsTable } from "@/components/history-results-table"
 import { useQuery } from "@tanstack/react-query"
 import type { BatchAnalysis, AnalysisResult } from "@shared/schema"
 
@@ -157,56 +158,11 @@ function BatchDetails({ batchId }: { batchId: number }) {
     )
   }
 
-  const { batch, results }: { batch: BatchAnalysis, results: AnalysisResult[] } = batchData
+  const { batch, results }: { batch: BatchAnalysis, results: any[] } = batchData
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {results.map((result, index) => {
-          let scores = { positive: 0, neutral: 0, negative: 0 }
-          try {
-            scores = JSON.parse(result.sentimentScores || '{}')
-          } catch (e) {
-            console.warn('Failed to parse sentiment scores for result', result.id)
-          }
-
-          return (
-            <Card
-              key={result.id}
-              className="bg-neutral-lightest border-neutral-lighter transition-transform duration-300 ease-in-out hover:scale-[1.01] hover:shadow-md"
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-neutral-darkest">{index + 1}. URL</CardTitle>
-                <p className="text-xs text-neutral-dark truncate">url: {result.url}</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <SentimentCircle 
-                  positive={scores.positive} 
-                  neutral={scores.neutral} 
-                  negative={scores.negative} 
-                />
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-neutral-darkest">Scores:</h4>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-[#4CAF50]"></span>
-                      <span className="text-xs text-neutral-dark">Positive: {scores.positive}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-[#FFB260]"></span>
-                      <span className="text-xs text-neutral-dark">Neutral: {scores.neutral}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-[#FF5757]"></span>
-                      <span className="text-xs text-neutral-dark">Negative: {scores.negative}%</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      <HistoryResultsTable results={results} />
     </div>
   )
 }

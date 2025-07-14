@@ -204,6 +204,293 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batch/:id", async (req: any, res) => {
     try {
       const batchId = InputSanitizer.validateBatchId(req.params.id);
+      
+      // Handle dummy batch data
+      if (batchId === 999) {
+        const dummyBatch = {
+          id: 999,
+          userId: "anonymous",
+          contentType: "tiktok",
+          totalVideos: 5,
+          totalWords: 1250,
+          avgConfidence: 85,
+          processingTime: 12.5,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 65,
+            NEUTRAL: 25,
+            NEGATIVE: 10
+          }),
+          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        };
+        
+        const dummyResults = [
+          {
+            id: 9991,
+            url: "https://www.tiktok.com/@foodie_life/video/7203152757287816494",
+            platform: "tiktok",
+            sentiment: "POSITIVE",
+            confidence: 88,
+            transcript: "This recipe is absolutely amazing! The flavors are incredible and so easy to make. Everyone should try this at home!",
+            wordCount: 142,
+            sentimentScores: JSON.stringify({
+              positive: 78,
+              neutral: 15,
+              negative: 7
+            }),
+            commonPositivePhrases: ["absolutely amazing", "incredible flavors", "everyone should try"],
+            commonNegativePhrases: ["too complicated", "expensive ingredients"],
+            batchId: 999,
+            createdAt: new Date()
+          },
+          {
+            id: 9992,
+            url: "https://www.tiktok.com/@travel_guru/video/7205660792853630214",
+            platform: "tiktok",
+            sentiment: "POSITIVE",
+            confidence: 92,
+            transcript: "Best vacation spot ever! Crystal clear waters, friendly locals, and unforgettable experiences. Highly recommend!",
+            wordCount: 89,
+            sentimentScores: JSON.stringify({
+              positive: 85,
+              neutral: 10,
+              negative: 5
+            }),
+            commonPositivePhrases: ["best vacation spot", "highly recommend", "unforgettable experiences"],
+            commonNegativePhrases: ["crowded beaches", "overpriced"],
+            batchId: 999,
+            createdAt: new Date()
+          },
+          {
+            id: 9993,
+            url: "https://www.tiktok.com/@tech_reviews/video/7203787386097241390",
+            platform: "tiktok",
+            sentiment: "NEUTRAL",
+            confidence: 75,
+            transcript: "This phone has decent battery life and good camera quality. The price is reasonable for what you get. Could be better though.",
+            wordCount: 156,
+            sentimentScores: JSON.stringify({
+              positive: 45,
+              neutral: 40,
+              negative: 15
+            }),
+            commonPositivePhrases: ["decent battery life", "good camera quality", "reasonable price"],
+            commonNegativePhrases: ["could be better", "not impressive", "limited features"],
+            batchId: 999,
+            createdAt: new Date()
+          },
+          {
+            id: 9994,
+            url: "https://www.tiktok.com/@fitness_coach/video/7341421020722613546",
+            platform: "tiktok",
+            sentiment: "POSITIVE",
+            confidence: 83,
+            transcript: "Love this workout routine! Gets your heart pumping and builds strength. Perfect for beginners and advanced users alike.",
+            wordCount: 98,
+            sentimentScores: JSON.stringify({
+              positive: 72,
+              neutral: 20,
+              negative: 8
+            }),
+            commonPositivePhrases: ["love this workout", "perfect for beginners", "builds strength"],
+            commonNegativePhrases: ["too intense", "hard to follow"],
+            batchId: 999,
+            createdAt: new Date()
+          },
+          {
+            id: 9995,
+            url: "https://www.tiktok.com/@music_lover/video/7298765432109876543",
+            platform: "tiktok",
+            sentiment: "NEGATIVE",
+            confidence: 79,
+            transcript: "This song is disappointing. The lyrics are confusing and the beat doesn't match the vibe. Not worth listening to.",
+            wordCount: 112,
+            sentimentScores: JSON.stringify({
+              positive: 15,
+              neutral: 25,
+              negative: 60
+            }),
+            commonPositivePhrases: ["catchy melody", "good vocals"],
+            commonNegativePhrases: ["disappointing", "confusing lyrics", "not worth listening"],
+            batchId: 999,
+            createdAt: new Date()
+          }
+        ];
+        
+        return res.json({ batch: dummyBatch, results: dummyResults });
+      }
+      
+      if (batchId === 998) {
+        const dummyBatch = {
+          id: 998,
+          userId: "anonymous",
+          contentType: "reels",
+          totalVideos: 3,
+          totalWords: 890,
+          avgConfidence: 92,
+          processingTime: 8.2,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 75,
+            NEUTRAL: 15,
+            NEGATIVE: 10
+          }),
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+        };
+        
+        const dummyResults = [
+          {
+            id: 9981,
+            url: "https://www.instagram.com/p/CpQrS9tOxYz/",
+            platform: "reels",
+            sentiment: "POSITIVE",
+            confidence: 94,
+            transcript: "Stunning sunset photography! The colors are breathtaking and the composition is perfect. This is art!",
+            wordCount: 134,
+            sentimentScores: JSON.stringify({
+              positive: 82,
+              neutral: 13,
+              negative: 5
+            }),
+            commonPositivePhrases: ["stunning photography", "breathtaking colors", "perfect composition"],
+            commonNegativePhrases: ["overexposed", "too filtered"],
+            batchId: 998,
+            createdAt: new Date()
+          },
+          {
+            id: 9982,
+            url: "https://www.instagram.com/p/CpRtU0vPzAb/",
+            platform: "reels",
+            sentiment: "POSITIVE",
+            confidence: 88,
+            transcript: "Amazing dance moves! The choreography is on point and the energy is infectious. Keep it up!",
+            wordCount: 87,
+            sentimentScores: JSON.stringify({
+              positive: 76,
+              neutral: 18,
+              negative: 6
+            }),
+            commonPositivePhrases: ["amazing dance moves", "on point", "infectious energy"],
+            commonNegativePhrases: ["off beat", "needs practice"],
+            batchId: 998,
+            createdAt: new Date()
+          },
+          {
+            id: 9983,
+            url: "https://www.instagram.com/p/CpStV1wQcDe/",
+            platform: "reels",
+            sentiment: "POSITIVE",
+            confidence: 91,
+            transcript: "Delicious looking dessert! The presentation is beautiful and I bet it tastes as good as it looks. Recipe please!",
+            wordCount: 156,
+            sentimentScores: JSON.stringify({
+              positive: 79,
+              neutral: 16,
+              negative: 5
+            }),
+            commonPositivePhrases: ["delicious looking", "beautiful presentation", "tastes good"],
+            commonNegativePhrases: ["too sweet", "complicated recipe"],
+            batchId: 998,
+            createdAt: new Date()
+          }
+        ];
+        
+        return res.json({ batch: dummyBatch, results: dummyResults });
+      }
+      
+      if (batchId === 997) {
+        const dummyBatch = {
+          id: 997,
+          userId: "anonymous",
+          contentType: "shorts",
+          totalVideos: 4,
+          totalWords: 1120,
+          avgConfidence: 78,
+          processingTime: 15.7,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 45,
+            NEUTRAL: 35,
+            NEGATIVE: 20
+          }),
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        };
+        
+        const dummyResults = [
+          {
+            id: 9971,
+            url: "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+            platform: "shorts",
+            sentiment: "POSITIVE",
+            confidence: 82,
+            transcript: "Great tutorial! Easy to follow steps and helpful tips. This will definitely help me improve my skills.",
+            wordCount: 145,
+            sentimentScores: JSON.stringify({
+              positive: 68,
+              neutral: 25,
+              negative: 7
+            }),
+            commonPositivePhrases: ["great tutorial", "easy to follow", "helpful tips"],
+            commonNegativePhrases: ["too fast", "needs more detail"],
+            batchId: 997,
+            createdAt: new Date()
+          },
+          {
+            id: 9972,
+            url: "https://www.youtube.com/shorts/oHg5SJYRHA0",
+            platform: "shorts",
+            sentiment: "NEUTRAL",
+            confidence: 71,
+            transcript: "This product is okay. It works as described but nothing special. Average quality for the price point.",
+            wordCount: 128,
+            sentimentScores: JSON.stringify({
+              positive: 35,
+              neutral: 50,
+              negative: 15
+            }),
+            commonPositivePhrases: ["works as described", "average quality"],
+            commonNegativePhrases: ["nothing special", "overpriced", "could be better"],
+            batchId: 997,
+            createdAt: new Date()
+          },
+          {
+            id: 9973,
+            url: "https://www.youtube.com/shorts/iik25wqIuFo",
+            platform: "shorts",
+            sentiment: "NEGATIVE",
+            confidence: 85,
+            transcript: "Terrible experience. Poor customer service and the product broke after one week. Would not recommend to anyone.",
+            wordCount: 167,
+            sentimentScores: JSON.stringify({
+              positive: 8,
+              neutral: 22,
+              negative: 70
+            }),
+            commonPositivePhrases: ["quick delivery", "good packaging"],
+            commonNegativePhrases: ["terrible experience", "poor customer service", "would not recommend"],
+            batchId: 997,
+            createdAt: new Date()
+          },
+          {
+            id: 9974,
+            url: "https://www.youtube.com/shorts/xvFZjo5PgG0",
+            platform: "shorts",
+            sentiment: "NEUTRAL",
+            confidence: 76,
+            transcript: "The movie was decent. Some good scenes but overall predictable plot. Worth watching once but not memorable.",
+            wordCount: 198,
+            sentimentScores: JSON.stringify({
+              positive: 40,
+              neutral: 45,
+              negative: 15
+            }),
+            commonPositivePhrases: ["decent movie", "some good scenes", "worth watching"],
+            commonNegativePhrases: ["predictable plot", "not memorable", "disappointing ending"],
+            batchId: 997,
+            createdAt: new Date()
+          }
+        ];
+        
+        return res.json({ batch: dummyBatch, results: dummyResults });
+      }
+      
       const batch = await storage.getBatchAnalysis(batchId);
       
       if (!batch) {
@@ -222,7 +509,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/history", async (req: any, res) => {
     try {
       const batches = await storage.getUserBatchAnalyses("anonymous");
-      res.json(batches);
+      
+      // Add dummy data with meaningful sentiment scores for UI testing
+      const dummyBatches = [
+        {
+          id: 999,
+          userId: "anonymous",
+          contentType: "tiktok",
+          totalVideos: 5,
+          totalWords: 1250,
+          avgConfidence: 85,
+          processingTime: 12.5,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 65,
+            NEUTRAL: 25,
+            NEGATIVE: 10
+          }),
+          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
+        },
+        {
+          id: 998,
+          userId: "anonymous",
+          contentType: "reels",
+          totalVideos: 3,
+          totalWords: 890,
+          avgConfidence: 92,
+          processingTime: 8.2,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 75,
+            NEUTRAL: 15,
+            NEGATIVE: 10
+          }),
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
+        },
+        {
+          id: 997,
+          userId: "anonymous",
+          contentType: "shorts",
+          totalVideos: 4,
+          totalWords: 1120,
+          avgConfidence: 78,
+          processingTime: 15.7,
+          sentimentCounts: JSON.stringify({
+            POSITIVE: 45,
+            NEUTRAL: 35,
+            NEGATIVE: 20
+          }),
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
+        }
+      ];
+      
+      // Combine real batches with dummy data
+      const allBatches = [...dummyBatches, ...batches];
+      res.json(allBatches);
     } catch (error) {
       console.error("History retrieval error:", error);
       res.status(500).json({ error: "Internal server error" });
