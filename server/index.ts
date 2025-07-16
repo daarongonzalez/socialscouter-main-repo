@@ -15,7 +15,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-eval'", "https://firebase.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "https://firebase.googleapis.com"],
-      connectSrc: ["'self'", "ws:", "wss:", "https://firebase.googleapis.com", "https://*.firebaseio.com", "https://*.firebase.googleapis.com"],
+      connectSrc: ["'self'", "ws:", "wss:", "https://*.googleapis.com", "https://*.google.com", "https://identitytoolkit.googleapis.com", "https://firebase.googleapis.com", "https://*.firebaseio.com", "https://*.firebase.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
