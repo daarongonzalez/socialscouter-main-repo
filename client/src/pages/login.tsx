@@ -22,12 +22,7 @@ export default function LoginPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Redirect to app if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/app");
-    }
-  }, [isAuthenticated, navigate]);
+  // Note: Redirect logic moved to useAuth hook to handle all authentication flows
 
   if (isLoading) {
     return (
@@ -37,11 +32,60 @@ export default function LoginPage() {
     );
   }
 
-  const handleAuthAction = async () => {
+  const handleEmailPasswordAuth = async () => {
+    if (!email || !password) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
+    if (isSignUp && password !== confirmPassword) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
+
     try {
       setAuthError(null);
       setIsAuthenticating(true);
-      console.log("Starting authentication...");
+      
+      if (isSignUp) {
+        const { signUpWithEmail } = await import("@/lib/firebase");
+        await signUpWithEmail(email, password);
+        console.log("User signed up successfully");
+      } else {
+        const { signInWithEmail } = await import("@/lib/firebase");
+        await signInWithEmail(email, password);
+        console.log("User signed in successfully");
+      }
+      // Navigation will be handled by useAuth hook
+    } catch (error: any) {
+      setIsAuthenticating(false);
+      console.error("Authentication error:", error);
+      
+      let errorMessage = "Authentication failed. Please try again.";
+      
+      if (error?.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email address.";
+      } else if (error?.code === "auth/wrong-password") {
+        errorMessage = "Incorrect password.";
+      } else if (error?.code === "auth/email-already-in-use") {
+        errorMessage = "An account with this email already exists.";
+      } else if (error?.code === "auth/weak-password") {
+        errorMessage = "Password should be at least 6 characters.";
+      } else if (error?.code === "auth/invalid-email") {
+        errorMessage = "Invalid email address.";
+      } else if (error?.message) {
+        errorMessage = `Authentication failed: ${error.message}`;
+      }
+      
+      setAuthError(errorMessage);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      setAuthError(null);
+      setIsAuthenticating(true);
+      console.log("Starting Google authentication...");
       const { signInWithGoogle } = await import("@/lib/firebase");
       await signInWithGoogle();
       // User will be redirected to Google and back
@@ -73,14 +117,14 @@ export default function LoginPage() {
       // Show pricing table when signing up
       setShowPricing(true);
     } else {
-      // Handle login
-      handleAuthAction();
+      // Handle email/password login
+      handleEmailPasswordAuth();
     }
   };
 
   const handlePlanSelect = (plan: string, isYearly: boolean) => {
     setSelectedPlan(`${plan}-${isYearly ? 'yearly' : 'monthly'}`);
-    handleAuthAction();
+    handleGoogleAuth();
   };
 
   const handleBackToSignup = () => {
@@ -106,7 +150,7 @@ export default function LoginPage() {
           <Button 
             variant="default" 
             className="bg-blue-ribbon hover:opacity-90 text-white px-6"
-            onClick={handleAuthAction}
+            onClick={handleGoogleAuth}
           >Login</Button>
         </div>
       </header>
@@ -223,7 +267,7 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full mt-4 border hover:bg-muted"
                   style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--neutral-600))' }}
-                  onClick={handleAuthAction}
+                  onClick={handleGoogleAuth}
                   disabled={isAuthenticating}
                 >
                   {isAuthenticating ? (
