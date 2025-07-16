@@ -13,7 +13,7 @@ export function Navbar() {
     try {
       const { logOut } = await import("@/lib/firebase");
       await logOut();
-      window.location.href = "/";
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -35,7 +35,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             {user ? (
-              <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <Link href="/app" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src={logoImage} alt="SocialScouter" className="h-10 w-auto" />
               </Link>
             ) : (
@@ -45,7 +45,7 @@ export function Navbar() {
             )}
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
-            <Link href="/history">
+            <Link href="/app/history">
               <Button
                 variant="ghost"
                 className="text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100"
@@ -84,7 +84,7 @@ export function Navbar() {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/subscribe" className="w-full flex items-center">
+                  <Link href="/app/subscribe" className="w-full flex items-center">
                     <CreditCard className="mr-2 h-4 w-4" />
                     Subscription
                   </Link>

@@ -99,6 +99,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- July 16, 2025: Implemented route-based authentication flow
+  - Created dedicated `/login` route for authentication portal
+  - Implemented `/app/*` route structure for authenticated application
+  - Separated login functionality from main app components
+  - Updated navigation to use new route structure (/app/dashboard, /app/history, /app/subscribe)
+  - Added proper redirect handling between login and app sections
+  - Fixed CSP configuration to allow Firebase authentication domains
+  - Maintains single-domain architecture for better security and user experience
+
 - June 29, 2025: Fixed sentiment score averaging calculation
   - Resolved issue where Average Score cards displayed tiny decimals (0.5%) instead of meaningful percentages
   - Fixed scale mismatch between sentiment analysis (percentages 0-100) and aggregation logic
