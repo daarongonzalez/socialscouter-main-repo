@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedPlan, setSelectedPlan] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Redirect to app if already authenticated
   useEffect(() => {
@@ -37,12 +38,28 @@ export default function LoginPage() {
 
   const handleAuthAction = async () => {
     try {
+      setAuthError(null);
+      console.log("Starting authentication...");
       const { signInWithGoogle } = await import("@/lib/firebase");
-      await signInWithGoogle();
+      const result = await signInWithGoogle();
+      console.log("Authentication successful:", result);
       // Navigation will happen automatically via useAuth hook
-    } catch (error) {
+    } catch (error: any) {
       console.error("Authentication error:", error);
-      alert("Authentication failed. Please try again.");
+      
+      let errorMessage = "Authentication failed. Please try again.";
+      
+      if (error?.code === "auth/unauthorized-domain") {
+        errorMessage = "Firebase authentication is not configured for this domain. Please contact support or try again later.";
+      } else if (error?.code === "auth/popup-blocked") {
+        errorMessage = "Popup blocked. Please allow popups for this site and try again.";
+      } else if (error?.code === "auth/popup-closed-by-user") {
+        errorMessage = "Authentication cancelled. Please try again.";
+      } else if (error?.message) {
+        errorMessage = `Authentication failed: ${error.message}`;
+      }
+      
+      setAuthError(errorMessage);
     }
   };
 
@@ -117,6 +134,11 @@ export default function LoginPage() {
         ) : (
           <Card className="w-full max-w-md mx-auto bg-white border-0 shadow-lg">
             <CardContent className="p-8">
+              {authError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-700">{authError}</p>
+                </div>
+              )}
               <form className="space-y-4">
                 {isSignUp && (
                   <div>

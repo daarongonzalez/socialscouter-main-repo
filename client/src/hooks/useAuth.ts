@@ -8,15 +8,26 @@ export function useAuth() {
   const queryClient = useQueryClient();
 
   // Get user data from backend after Firebase auth
-  const { data: backendUser } = useQuery({
+  const { data: backendUser, error: backendError } = useQuery({
     queryKey: ["/api/auth/user"],
     enabled: !!firebaseUser?.uid,
     retry: false,
   });
 
+  // Debug backend user fetch
+  useEffect(() => {
+    if (firebaseUser?.uid && backendError) {
+      console.error("Backend user fetch error:", backendError);
+    }
+    if (backendUser) {
+      console.log("Backend user data:", backendUser);
+    }
+  }, [backendUser, backendError, firebaseUser]);
+
   useEffect(() => {
     // Listen to auth state changes
     const unsubscribe = onAuthStateChange((user) => {
+      console.log("Firebase auth state changed:", user ? `User: ${user.email}` : "No user");
       setFirebaseUser(user);
       setIsLoading(false);
       
