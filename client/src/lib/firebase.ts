@@ -19,12 +19,10 @@ const provider = new GoogleAuthProvider();
 provider.addScope('email');
 provider.addScope('profile');
 
-// Sign in with Google - use popup for development, redirect for production
+// Sign in with Google - use redirect for more reliable authentication
 export function signInWithGoogle() {
-  // In development, use popup to avoid domain issues
-  if (import.meta.env.DEV) {
-    return signInWithPopup(auth, provider);
-  }
+  // Always use redirect for more reliable authentication
+  // Popup can be blocked or closed accidentally
   return signInWithRedirect(auth, provider);
 }
 

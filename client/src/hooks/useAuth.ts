@@ -40,16 +40,14 @@ export function useAuth() {
       }
     });
 
-    // Handle redirect result on page load (only in production)
-    if (!import.meta.env.DEV) {
-      handleRedirectResult().then((result) => {
-        if (result?.user) {
-          console.log("Redirect authentication successful");
-        }
-      }).catch((error) => {
-        console.error("Error handling redirect result:", error);
-      });
-    }
+    // Handle redirect result on page load
+    handleRedirectResult().then((result) => {
+      if (result?.user) {
+        console.log("Redirect authentication successful");
+      }
+    }).catch((error) => {
+      console.error("Error handling redirect result:", error);
+    });
 
     return () => unsubscribe();
   }, [queryClient]);
