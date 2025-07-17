@@ -38,7 +38,15 @@ export function UsageDisplay() {
   }
 
   if (!planInfo) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-neutral-500">
+            <p>Unable to load plan information</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const usagePercentage = (planInfo.currentUsage.monthlyVideoCount / planInfo.planLimits.monthlyVideoLimit) * 100;
