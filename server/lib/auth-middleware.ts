@@ -26,13 +26,24 @@ export async function authenticateFirebaseToken(
     const firebaseUser = await getFirebaseUser(decodedToken.uid);
     
     // Get or create user in our database
-    const user = await storage.upsertUser({
-      id: decodedToken.uid,
-      email: decodedToken.email || firebaseUser.email || '',
-      firstName: decodedToken.name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0] || '',
-      lastName: decodedToken.name?.split(' ').slice(1).join(' ') || firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
-      profileImageUrl: decodedToken.picture || firebaseUser.photoURL || null,
-    });
+    let user;
+    try {
+      user = await storage.upsertUser({
+        id: decodedToken.uid,
+        email: decodedToken.email || firebaseUser.email || '',
+        firstName: decodedToken.name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0] || '',
+        lastName: decodedToken.name?.split(' ').slice(1).join(' ') || firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
+        profileImageUrl: decodedToken.picture || firebaseUser.photoURL || null,
+      });
+    } catch (error: any) {
+      // Handle unique constraint violation for email (legacy user migration)
+      if (error.code === '23505' && error.constraint === 'users_email_unique') {
+        // Try to get existing user by email and update with Firebase UID
+        user = await storage.migrateUserToFirebase(decodedToken.uid, decodedToken.email || firebaseUser.email || '');
+      } else {
+        throw error;
+      }
+    }
 
     req.user = user;
     req.firebaseUser = firebaseUser;
