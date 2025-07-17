@@ -27,6 +27,9 @@ export interface IStorage {
   resetMonthlyUsageIfNeeded(userId: string): Promise<User>;
   getUserUsage(userId: string): Promise<{ monthlyVideoCount: number; lastResetDate: Date; subscriptionPlan: string | null; subscriptionStatus: string | null } | null>;
   
+  // Migration helper
+  migrateUserToFirebase(firebaseUid: string, email: string): Promise<User>;
+  
   createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult>;
   getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]>;
   
@@ -203,6 +206,49 @@ export class DatabaseStorage implements IStorage {
       .from(batchAnalysis)
       .where(eq(batchAnalysis.userId, userId))
       .orderBy(desc(batchAnalysis.id));
+  }
+
+  async migrateUserToFirebase(firebaseUid: string, email: string): Promise<User> {
+    // Get existing user by email
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    
+    if (!existingUser) {
+      throw new Error('User not found for migration');
+    }
+
+    // Update all batch analyses to use the new Firebase UID
+    await db
+      .update(batchAnalysis)
+      .set({ userId: firebaseUid })
+      .where(eq(batchAnalysis.userId, existingUser.id));
+
+    // Delete the old user record
+    await db
+      .delete(users)
+      .where(eq(users.id, existingUser.id));
+
+    // Create new user with Firebase UID, preserving existing data
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: firebaseUid,
+        email: existingUser.email,
+        firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
+        profileImageUrl: existingUser.profileImageUrl,
+        stripeCustomerId: existingUser.stripeCustomerId,
+        stripeSubscriptionId: existingUser.stripeSubscriptionId,
+        subscriptionPlan: existingUser.subscriptionPlan,
+        subscriptionStatus: existingUser.subscriptionStatus,
+        monthlyVideoCount: existingUser.monthlyVideoCount,
+        lastResetDate: existingUser.lastResetDate,
+      })
+      .returning();
+
+    return user;
   }
 }
 
