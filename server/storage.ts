@@ -219,15 +219,10 @@ export class DatabaseStorage implements IStorage {
       throw new Error('User not found for migration');
     }
 
-    // Update all batch analyses to use the new Firebase UID
+    // First, temporarily clear the email to avoid unique constraint
     await db
-      .update(batchAnalysis)
-      .set({ userId: firebaseUid })
-      .where(eq(batchAnalysis.userId, existingUser.id));
-
-    // Delete the old user record
-    await db
-      .delete(users)
+      .update(users)
+      .set({ email: `temp_${Date.now()}_${existingUser.email}` })
       .where(eq(users.id, existingUser.id));
 
     // Create new user with Firebase UID, preserving existing data
@@ -235,7 +230,7 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values({
         id: firebaseUid,
-        email: existingUser.email,
+        email: existingUser.email, // Use original email
         firstName: existingUser.firstName,
         lastName: existingUser.lastName,
         profileImageUrl: existingUser.profileImageUrl,
@@ -247,6 +242,17 @@ export class DatabaseStorage implements IStorage {
         lastResetDate: existingUser.lastResetDate,
       })
       .returning();
+
+    // Update all batch analyses to use the new Firebase UID
+    await db
+      .update(batchAnalysis)
+      .set({ userId: firebaseUid })
+      .where(eq(batchAnalysis.userId, existingUser.id));
+
+    // Delete the old user record
+    await db
+      .delete(users)
+      .where(eq(users.id, existingUser.id));
 
     return user;
   }
