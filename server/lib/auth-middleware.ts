@@ -29,8 +29,8 @@ export async function authenticateFirebaseToken(
     const user = await storage.upsertUser({
       id: decodedToken.uid,
       email: decodedToken.email || firebaseUser.email || '',
-      firstName: decodedToken.name?.split(' ')[0] || '',
-      lastName: decodedToken.name?.split(' ').slice(1).join(' ') || '',
+      firstName: decodedToken.name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0] || '',
+      lastName: decodedToken.name?.split(' ').slice(1).join(' ') || firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
       profileImageUrl: decodedToken.picture || firebaseUser.photoURL || null,
     });
 
