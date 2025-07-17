@@ -32,10 +32,11 @@ export default function AppLayout() {
 
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/history" component={HistoryPage} />
-      <Route path="/subscribe" component={Subscribe} />
+      <Route path="/app" component={Dashboard} />
+      <Route path="/app/" component={Dashboard} />
+      <Route path="/app/dashboard" component={Dashboard} />
+      <Route path="/app/history" component={HistoryPage} />
+      <Route path="/app/subscribe" component={Subscribe} />
       <Route component={NotFound} />
     </Switch>
   );
