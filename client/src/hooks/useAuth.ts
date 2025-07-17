@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChange, handleRedirectResult } from "@/lib/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
   // Get user data from backend after Firebase auth
@@ -34,6 +36,10 @@ export function useAuth() {
       if (user) {
         // Invalidate queries to refetch user data when user signs in
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Redirect to app if user just authenticated
+        if (window.location.pathname === "/login") {
+          navigate("/app");
+        }
       } else {
         // Clear all queries when user signs out
         queryClient.clear();
