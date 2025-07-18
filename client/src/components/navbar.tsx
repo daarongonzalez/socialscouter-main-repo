@@ -55,7 +55,7 @@ export function Navbar() {
             </Link>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
