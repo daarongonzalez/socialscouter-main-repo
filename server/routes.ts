@@ -9,6 +9,7 @@ import { planLimitsService } from "./lib/plan-limits-service";
 import { getSession } from "./session";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
+import { extractPhrases } from "./lib/phrase-extractor";
 import { getCsrfToken } from "./lib/csrf-middleware";
 import { authenticateFirebaseToken, type AuthenticatedRequest } from "./lib/auth-middleware";
 import Stripe from "stripe";
@@ -153,13 +154,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               confidence: 0.5,
               transcript: "No transcript available",
               wordCount: 0,
-              sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
+              sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 }),
+              commonPositivePhrases: JSON.stringify([]),
+              commonNegativePhrases: JSON.stringify([])
             });
             continue;
           }
 
           // Analyze sentiment
           const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+          
+          // Extract positive and negative phrases
+          const extractedPhrases = extractPhrases(transcript);
           
           // Create analysis result
           const analysisResult = await storage.createAnalysisResult({
@@ -170,7 +176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
             wordCount: transcript.split(' ').length,
-            sentimentScores: JSON.stringify(sentimentResult.scores || {})
+            sentimentScores: JSON.stringify(sentimentResult.scores || {}),
+            commonPositivePhrases: JSON.stringify(extractedPhrases.positivePhrases),
+            commonNegativePhrases: JSON.stringify(extractedPhrases.negativePhrases)
           });
 
           results.push(analysisResult);
@@ -195,7 +203,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             confidence: 0.5,
             transcript: "Error processing video",
             wordCount: 0,
-            sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
+            sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 }),
+            commonPositivePhrases: JSON.stringify([]),
+            commonNegativePhrases: JSON.stringify([])
           });
         }
       }

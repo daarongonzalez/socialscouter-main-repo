@@ -52,6 +52,8 @@ export const analysisResults = pgTable("analysis_results", {
   transcript: text("transcript").notNull(),
   wordCount: integer("word_count").notNull(),
   sentimentScores: text("sentiment_scores"), // JSON string containing {positive, neutral, negative}
+  commonPositivePhrases: text("common_positive_phrases"), // JSON array of positive phrases
+  commonNegativePhrases: text("common_negative_phrases"), // JSON array of negative phrases
   batchId: integer("batch_id").references(() => batchAnalysis.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

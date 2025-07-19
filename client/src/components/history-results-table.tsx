@@ -12,6 +12,8 @@ interface HistoryResult {
   transcript: string;
   wordCount: number;
   sentimentScores: string;
+  commonPositivePhrases: string;
+  commonNegativePhrases: string;
   batchId: number;
   createdAt: string;
 }
@@ -57,6 +59,17 @@ export function HistoryResultsTable({ results }: HistoryResultsTableProps) {
     return transcript.length > maxLength ? transcript.substring(0, maxLength) + '...' : transcript;
   };
 
+  const formatPhrases = (phrasesJson: string): string => {
+    try {
+      const phrases = JSON.parse(phrasesJson);
+      return Array.isArray(phrases) && phrases.length > 0 
+        ? phrases.slice(0, 2).join(', ') 
+        : 'None detected';
+    } catch {
+      return 'None detected';
+    }
+  };
+
   const shortenUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
@@ -87,8 +100,8 @@ export function HistoryResultsTable({ results }: HistoryResultsTableProps) {
                 <th className="text-left py-3 px-4 font-medium text-neutral-700">Positive %</th>
                 <th className="text-left py-3 px-4 font-medium text-neutral-700">Neutral %</th>
                 <th className="text-left py-3 px-4 font-medium text-neutral-700">Negative %</th>
-                <th className="text-left py-3 px-4 font-medium text-neutral-700">Word Count</th>
-                <th className="text-left py-3 px-4 font-medium text-neutral-700">Transcript Preview</th>
+                <th className="text-left py-3 px-4 font-medium text-neutral-700">Positive Phrases</th>
+                <th className="text-left py-3 px-4 font-medium text-neutral-700">Negative Phrases</th>
               </tr>
             </thead>
             <tbody>
@@ -149,12 +162,16 @@ export function HistoryResultsTable({ results }: HistoryResultsTableProps) {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-sm text-neutral-600">{result.wordCount}</span>
+                      <div className="max-w-[200px]">
+                        <span className="text-sm text-green-700 font-medium">
+                          {formatPhrases(result.commonPositivePhrases || '[]')}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="max-w-[300px]">
-                        <span className="text-sm text-neutral-600">
-                          {truncateTranscript(result.transcript)}
+                      <div className="max-w-[200px]">
+                        <span className="text-sm text-red-700 font-medium">
+                          {formatPhrases(result.commonNegativePhrases || '[]')}
                         </span>
                       </div>
                     </td>
