@@ -84,9 +84,10 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // CSRF protection for all routes except webhooks and health checks
 app.use((req, res, next) => {
-  // Skip CSRF for webhooks and health checks only
+  // Skip CSRF for webhooks, health checks, and admin routes
   if (req.path.startsWith('/api/stripe/webhook') || 
-      req.path === '/api/health') {
+      req.path === '/api/health' ||
+      req.path.startsWith('/api/admin/')) {
     return next();
   }
   csrfMiddleware(req, res, next);

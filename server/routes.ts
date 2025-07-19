@@ -212,6 +212,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentimentScores.negative = sentimentScores.negative / totalVideos;
       }
 
+      // Update the batch with calculated results
+      await storage.updateBatchAnalysis(batch.id, {
+        totalWords,
+        avgConfidence,
+        processingTime,
+        sentimentCounts: JSON.stringify(sentimentCounts)
+      });
+
       // Record video usage for the user
       await planLimitsService.recordVideoUsage(userId, totalVideos);
 
@@ -274,6 +282,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(batches);
     } catch (error) {
       console.error("Error fetching history:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Fix incomplete batch data (admin route)
+  app.post("/api/admin/fix-batch-data", async (req, res) => {
+    try {
+      await storage.fixIncompleteBatchData();
+      res.json({ message: "Batch data fixed successfully" });
+    } catch (error) {
+      console.error("Error fixing batch data:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
