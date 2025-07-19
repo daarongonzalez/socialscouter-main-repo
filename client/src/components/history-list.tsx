@@ -140,7 +140,7 @@ function BatchDetails({ batchId }: { batchId: number }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   
   const { data: batchData, isLoading } = useQuery({
-    queryKey: ['/api/batch', batchId],
+    queryKey: [`/api/batch/${batchId}`],
     enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
   })
 
