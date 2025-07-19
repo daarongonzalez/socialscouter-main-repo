@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Calendar, ExternalLink } from "lucide-react"
 import { SentimentCircle } from "@/components/sentiment-circle"
 import { HistoryResultsTable } from "@/components/history-results-table"
 import { useQuery } from "@tanstack/react-query"
+import { useAuth } from "@/hooks/useAuth"
 import type { BatchAnalysis, AnalysisResult } from "@shared/schema"
 
 interface HistoryListProps {
@@ -136,16 +137,14 @@ export function HistoryList({ batches }: HistoryListProps) {
 }
 
 function BatchDetails({ batchId }: { batchId: number }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  
   const { data: batchData, isLoading } = useQuery({
     queryKey: ['/api/batch', batchId],
-    queryFn: async () => {
-      const response = await fetch(`/api/batch/${batchId}`)
-      if (!response.ok) throw new Error('Failed to fetch batch details')
-      return response.json()
-    }
+    enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
   })
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="mt-6 text-center">
         <p className="text-neutral-500">Loading batch details...</p>
