@@ -33,7 +33,7 @@ export function Navbar() {
     <nav className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-6">
-          <Link href="/dashboard" className="flex items-center space-x-2">
+          <Link href="/app/dashboard" className="flex items-center space-x-2">
             <img 
               src={logoImage} 
               alt="SocialScouter" 
@@ -41,13 +41,13 @@ export function Navbar() {
             />
           </Link>
           <div className="flex items-center space-x-4">
-            <Link href="/dashboard">
+            <Link href="/app/dashboard">
               <Button variant="ghost" className="flex items-center space-x-2">
                 <BarChart3 className="h-4 w-4" />
                 <span>Dashboard</span>
               </Button>
             </Link>
-            <Link href="/history">
+            <Link href="/app/history">
               <Button variant="ghost" className="flex items-center space-x-2">
                 <History className="h-4 w-4" />
                 <span>History</span>
