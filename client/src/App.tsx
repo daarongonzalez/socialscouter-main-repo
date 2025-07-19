@@ -4,8 +4,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/login";
-import AppLayout from "@/pages/app";
+import Dashboard from "@/pages/dashboard";
+import HistoryPage from "@/pages/history";
+import Subscribe from "@/pages/subscribe";
 import NotFound from "@/pages/not-found";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -17,7 +20,7 @@ function RootRedirect() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        navigate("/app");
+        navigate("/dashboard");
       } else {
         navigate("/login");
       }
@@ -40,7 +43,21 @@ function Router() {
     <Switch>
       <Route path="/" component={RootRedirect} />
       <Route path="/login" component={LoginPage} />
-      <Route path="/app*" component={AppLayout} />
+      <Route path="/dashboard">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/history">
+        <ProtectedRoute>
+          <HistoryPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/subscribe">
+        <ProtectedRoute>
+          <Subscribe />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
