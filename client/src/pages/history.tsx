@@ -2,15 +2,17 @@ import { Navbar } from "@/components/navbar"
 import { HistoryOverview } from "@/components/history-overview"
 import { HistoryList } from "@/components/history-list"
 import { useQuery } from "@tanstack/react-query"
-import { useAuth } from "@/hooks/useAuth"
 import type { BatchAnalysis } from "@shared/schema"
 
 export default function HistoryPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
-  
   const { data: batches, isLoading, error } = useQuery({
     queryKey: ['/api/history'],
-    enabled: isAuthenticated && !authLoading, // Only run query when authenticated
+    queryFn: async (): Promise<BatchAnalysis[]> => {
+      const response = await fetch('/api/history')
+      if (!response.ok) throw new Error('Failed to fetch history')
+      const data = await response.json()
+      return data
+    }
   })
 
 

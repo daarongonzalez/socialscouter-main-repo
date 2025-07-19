@@ -138,6 +138,11 @@ export function HistoryList({ batches }: HistoryListProps) {
 function BatchDetails({ batchId }: { batchId: number }) {
   const { data: batchData, isLoading } = useQuery({
     queryKey: ['/api/batch', batchId],
+    queryFn: async () => {
+      const response = await fetch(`/api/batch/${batchId}`)
+      if (!response.ok) throw new Error('Failed to fetch batch details')
+      return response.json()
+    }
   })
 
   if (isLoading) {
