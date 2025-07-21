@@ -12,11 +12,12 @@ export interface AuthSyncResponse {
  */
 export async function syncUserAfterAuth(displayName?: string): Promise<AuthSyncResponse> {
   try {
-    const response = await apiRequest('/api/auth/sync', 'POST', {
+    const response = await apiRequest('POST', '/api/auth/sync', {
       displayName: displayName || ''
     });
     
-    return response as AuthSyncResponse;
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Auth sync error:', error);
     return {
