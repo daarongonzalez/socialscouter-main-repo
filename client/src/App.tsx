@@ -68,6 +68,7 @@ function Router() {
     <Switch>
       <Route path="/" component={RootRedirect} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/app" component={LoginPage} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/history" component={() => <ProtectedRoute component={HistoryPage} />} />
       <Route path="/subscribe" component={() => <ProtectedRoute component={Subscribe} />} />

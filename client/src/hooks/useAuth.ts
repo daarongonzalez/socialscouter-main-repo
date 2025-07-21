@@ -40,9 +40,9 @@ export function useAuth() {
         
         // Invalidate queries to refetch user data when user signs in
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        // Redirect to app if user just authenticated
-        if (window.location.pathname === "/login") {
-          navigate("/app");
+        // Redirect to dashboard if user just authenticated
+        if (window.location.pathname === "/login" || window.location.pathname === "/app") {
+          navigate("/dashboard");
         }
       } else {
         // Clear all queries when user signs out

@@ -57,7 +57,7 @@ export default function LoginPage() {
     try {
       setAuthError(null);
       setIsAuthenticating(true);
-      
+
       if (isSignUp) {
         const { signUpWithEmail } = await import("@/lib/firebase");
         await signUpWithEmail(email, password);
@@ -67,19 +67,19 @@ export default function LoginPage() {
         await signInWithEmail(email, password);
         console.log("User signed in successfully");
       }
-      
+
       // If there's a selected plan, create subscription after authentication
       if (selectedPlan) {
         await handlePostAuthSubscription(selectedPlan, false);
       }
-      
+
       // Navigation will be handled by useAuth hook
     } catch (error: any) {
       setIsAuthenticating(false);
       console.error("Authentication error:", error);
-      
+
       let errorMessage = "Authentication failed. Please try again.";
-      
+
       if (error?.code === "auth/user-not-found") {
         errorMessage = "No account found with this email address.";
       } else if (error?.code === "auth/wrong-password") {
@@ -93,45 +93,34 @@ export default function LoginPage() {
       } else if (error?.message) {
         errorMessage = `Authentication failed: ${error.message}`;
       }
-      
+
       setAuthError(errorMessage);
     }
   };
 
   const handleGoogleAuth = async () => {
     try {
-      setAuthError(null);
       setIsAuthenticating(true);
-      console.log("Starting Google authentication...");
+      setAuthError(null);
+
       const { signInWithGoogle } = await import("@/lib/firebase");
-      await signInWithGoogle();
-      
-      // If there's a selected plan, create subscription after authentication
-      if (selectedPlan) {
-        await handlePostAuthSubscription(selectedPlan, false);
+      const result = await signInWithGoogle();
+
+      if (result?.user) {
+        console.log("Google authentication successful");
+        // Check if user had a plan selected before auth
+        if (selectedPlan) {
+          const [planName, billing] = selectedPlan.split('-');
+          const isYearly = billing === 'yearly';
+          // Process the subscription after successful authentication
+          await handlePostAuthSubscription(planName, isYearly);
+        }
       }
-      
-      // User will be redirected to Google and back
-      console.log("Redirecting to Google for authentication...");
-    } catch (error: any) {
-      setIsAuthenticating(false);
+    } catch (error) {
       console.error("Authentication error:", error);
-      
-      let errorMessage = "Authentication failed. Please try again.";
-      
-      if (error?.code === "auth/unauthorized-domain") {
-        errorMessage = "Firebase authentication is not configured for this domain. Please contact support or try again later.";
-      } else if (error?.code === "auth/popup-blocked") {
-        errorMessage = "Authentication redirecting... If this doesn't work, please allow popups for this site.";
-      } else if (error?.code === "auth/popup-closed-by-user") {
-        errorMessage = "Authentication redirecting... Please wait to be redirected to Google sign-in.";
-      } else if (error?.code === "auth/redirect-cancelled-by-user") {
-        errorMessage = "Authentication was cancelled. Please try again.";
-      } else if (error?.message) {
-        errorMessage = `Authentication failed: ${error.message}`;
-      }
-      
-      setAuthError(errorMessage);
+      setAuthError("Authentication failed. Please try again.");
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -139,14 +128,14 @@ export default function LoginPage() {
     try {
       console.log(`Creating subscription for plan: ${planName}`);
       const { apiRequest } = await import("@/lib/queryClient");
-      
+
       const response = await apiRequest("POST", "/api/create-subscription", { 
         plan: planName.toLowerCase(), 
         isYearly
       });
-      
+
       const data = await response.json();
-      
+
       if (data.clientSecret) {
         setCheckoutData({ 
           planName: planName.toLowerCase(), 
@@ -180,13 +169,13 @@ export default function LoginPage() {
       setShowCheckout(true);
       return;
     }
-    
+
     // For authenticated users, create subscription directly without going back to auth form
     if (isAuthenticated) {
       await handlePostAuthSubscription(planName, isYearly);
       return;
     }
-    
+
     // For unauthenticated users in sign-up flow - store plan and show auth form
     setSelectedPlan(planName);
     setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
@@ -211,13 +200,13 @@ export default function LoginPage() {
             <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Blog</span>
             <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Products</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <a href="https://socialscouter.ai/" className="hover:opacity-80 transition-opacity">
               <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
             </a>
           </div>
-          
+
           <Button 
             variant="default" 
             className="bg-blue-ribbon hover:opacity-90 text-white px-6"
@@ -225,7 +214,7 @@ export default function LoginPage() {
           >Login</Button>
         </div>
       </header>
-      
+
       {/* Main Content */}
       {showCheckout && checkoutData ? (
         <div className="px-4 py-16">

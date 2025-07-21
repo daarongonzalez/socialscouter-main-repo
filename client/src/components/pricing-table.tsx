@@ -20,22 +20,11 @@ export function PricingTable({ onPlanSelect, isSignUpFlow = false }: PricingTabl
   const { toast } = useToast();
 
   const handlePlanSelection = async (planName: string) => {
-    // During sign-up flow, allow plan selection without authentication
-    // Authentication will happen after plan selection
-    if (!isAuthenticated && !isSignUpFlow) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to select a subscription plan.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsLoading(planName);
     
     try {
-      if (isSignUpFlow && !isAuthenticated) {
-        // For sign-up flow, pass plan selection to parent without creating subscription
+      if (!isAuthenticated) {
+        // For unauthenticated users, pass plan selection to parent 
         // Parent will handle authentication first, then create subscription
         onPlanSelect(planName.toLowerCase(), isYearly, '');
         return;
