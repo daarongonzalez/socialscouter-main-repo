@@ -29,7 +29,11 @@ export default function LoginPage() {
     clientSecret: string;
   } | null>(null);
 
-  // Note: Redirect logic moved to useAuth hook to handle all authentication flows
+  // Redirect authenticated users to app (unless they're in checkout flow)
+  if (isAuthenticated && !showCheckout && !showPricing) {
+    navigate("/app");
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -66,7 +70,7 @@ export default function LoginPage() {
       
       // If there's a selected plan, create subscription after authentication
       if (selectedPlan) {
-        await handlePostAuthSubscription(selectedPlan);
+        await handlePostAuthSubscription(selectedPlan, false);
       }
       
       // Navigation will be handled by useAuth hook
@@ -104,7 +108,7 @@ export default function LoginPage() {
       
       // If there's a selected plan, create subscription after authentication
       if (selectedPlan) {
-        await handlePostAuthSubscription(selectedPlan);
+        await handlePostAuthSubscription(selectedPlan, false);
       }
       
       // User will be redirected to Google and back
@@ -131,14 +135,14 @@ export default function LoginPage() {
     }
   };
 
-  const handlePostAuthSubscription = async (planName: string) => {
+  const handlePostAuthSubscription = async (planName: string, isYearly: boolean = false) => {
     try {
       console.log(`Creating subscription for plan: ${planName}`);
       const { apiRequest } = await import("@/lib/queryClient");
       
       const response = await apiRequest("POST", "/api/create-subscription", { 
         plan: planName.toLowerCase(), 
-        isYearly: false // Default to monthly, can be enhanced later
+        isYearly
       });
       
       const data = await response.json();
@@ -146,15 +150,16 @@ export default function LoginPage() {
       if (data.clientSecret) {
         setCheckoutData({ 
           planName: planName.toLowerCase(), 
-          isYearly: false, 
+          isYearly, 
           clientSecret: data.clientSecret 
         });
         setShowCheckout(true);
         setSelectedPlan(""); // Clear selected plan
+        setShowPricing(false); // Hide pricing table
       }
     } catch (error) {
       console.error("Error creating post-auth subscription:", error);
-      setAuthError("Authentication successful, but failed to process subscription. Please try again.");
+      setAuthError("Failed to process subscription. Please try again.");
     }
   };
 
@@ -169,18 +174,23 @@ export default function LoginPage() {
   };
 
   const handlePlanSelect = async (planName: string, isYearly: boolean, clientSecret: string) => {
-    if (!clientSecret) {
-      // This is sign-up flow - store plan selection and prompt for authentication
-      setSelectedPlan(planName);
-      setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
-      // Show sign-up form to complete authentication
-      setShowPricing(false);
+    if (clientSecret) {
+      // This is authenticated flow with subscription created - proceed to checkout
+      setCheckoutData({ planName, isYearly, clientSecret });
+      setShowCheckout(true);
       return;
     }
     
-    // This is authenticated flow - proceed to checkout
-    setCheckoutData({ planName, isYearly, clientSecret });
-    setShowCheckout(true);
+    // For authenticated users, create subscription directly without going back to auth form
+    if (isAuthenticated) {
+      await handlePostAuthSubscription(planName, isYearly);
+      return;
+    }
+    
+    // For unauthenticated users in sign-up flow - store plan and show auth form
+    setSelectedPlan(planName);
+    setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
+    setShowPricing(false);
   };
 
   const handleBackToSignup = () => {
