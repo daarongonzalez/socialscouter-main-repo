@@ -63,6 +63,12 @@ export default function LoginPage() {
         await signInWithEmail(email, password);
         console.log("User signed in successfully");
       }
+      
+      // If there's a selected plan, create subscription after authentication
+      if (selectedPlan) {
+        await handlePostAuthSubscription(selectedPlan);
+      }
+      
       // Navigation will be handled by useAuth hook
     } catch (error: any) {
       setIsAuthenticating(false);
@@ -95,6 +101,12 @@ export default function LoginPage() {
       console.log("Starting Google authentication...");
       const { signInWithGoogle } = await import("@/lib/firebase");
       await signInWithGoogle();
+      
+      // If there's a selected plan, create subscription after authentication
+      if (selectedPlan) {
+        await handlePostAuthSubscription(selectedPlan);
+      }
+      
       // User will be redirected to Google and back
       console.log("Redirecting to Google for authentication...");
     } catch (error: any) {
@@ -119,6 +131,33 @@ export default function LoginPage() {
     }
   };
 
+  const handlePostAuthSubscription = async (planName: string) => {
+    try {
+      console.log(`Creating subscription for plan: ${planName}`);
+      const { apiRequest } = await import("@/lib/queryClient");
+      
+      const response = await apiRequest("POST", "/api/create-subscription", { 
+        plan: planName.toLowerCase(), 
+        isYearly: false // Default to monthly, can be enhanced later
+      });
+      
+      const data = await response.json();
+      
+      if (data.clientSecret) {
+        setCheckoutData({ 
+          planName: planName.toLowerCase(), 
+          isYearly: false, 
+          clientSecret: data.clientSecret 
+        });
+        setShowCheckout(true);
+        setSelectedPlan(""); // Clear selected plan
+      }
+    } catch (error) {
+      console.error("Error creating post-auth subscription:", error);
+      setAuthError("Authentication successful, but failed to process subscription. Please try again.");
+    }
+  };
+
   const handleSignUpClick = () => {
     if (isSignUp && !showPricing) {
       // Show pricing table when signing up
@@ -129,7 +168,17 @@ export default function LoginPage() {
     }
   };
 
-  const handlePlanSelect = (planName: string, isYearly: boolean, clientSecret: string) => {
+  const handlePlanSelect = async (planName: string, isYearly: boolean, clientSecret: string) => {
+    if (!clientSecret) {
+      // This is sign-up flow - store plan selection and prompt for authentication
+      setSelectedPlan(planName);
+      setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
+      // Show sign-up form to complete authentication
+      setShowPricing(false);
+      return;
+    }
+    
+    // This is authenticated flow - proceed to checkout
     setCheckoutData({ planName, isYearly, clientSecret });
     setShowCheckout(true);
   };
@@ -200,7 +249,7 @@ export default function LoginPage() {
                 Select a plan that works for your needs
               </p>
             </div>
-            <PricingTable onPlanSelect={handlePlanSelect} />
+            <PricingTable onPlanSelect={handlePlanSelect} isSignUpFlow={true} />
           </div>
         ) : (
           <Card className="w-full max-w-md mx-auto bg-white border-0 shadow-lg">

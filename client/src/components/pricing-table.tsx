@@ -10,16 +10,19 @@ import users3Icon from '@assets/Users-3.png';
 
 interface PricingTableProps {
   onPlanSelect: (plan: string, isYearly: boolean, clientSecret: string) => void;
+  isSignUpFlow?: boolean; // New prop to indicate if this is part of sign-up process
 }
 
-export function PricingTable({ onPlanSelect }: PricingTableProps) {
+export function PricingTable({ onPlanSelect, isSignUpFlow = false }: PricingTableProps) {
   const [isYearly, setIsYearly] = useState(false);
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
 
   const handlePlanSelection = async (planName: string) => {
-    if (!isAuthenticated) {
+    // During sign-up flow, allow plan selection without authentication
+    // Authentication will happen after plan selection
+    if (!isAuthenticated && !isSignUpFlow) {
       toast({
         title: "Authentication Required",
         description: "Please sign in to select a subscription plan.",
@@ -29,7 +32,16 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
     }
 
     setIsLoading(planName);
+    
     try {
+      if (isSignUpFlow && !isAuthenticated) {
+        // For sign-up flow, pass plan selection to parent without creating subscription
+        // Parent will handle authentication first, then create subscription
+        onPlanSelect(planName.toLowerCase(), isYearly, '');
+        return;
+      }
+
+      // For authenticated users, create subscription immediately
       const response = await apiRequest("POST", "/api/create-subscription", { 
         plan: planName.toLowerCase(), 
         isYearly 
