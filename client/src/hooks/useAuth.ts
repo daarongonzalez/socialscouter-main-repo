@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChange, handleRedirectResult } from "@/lib/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { handlePostAuthFlow } from "@/lib/auth-sync";
 
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<any>(null);
@@ -34,6 +35,9 @@ export function useAuth() {
       setIsLoading(false);
       
       if (user) {
+        // Sync user with backend systems after authentication
+        handlePostAuthFlow({ displayName: user.displayName || undefined });
+        
         // Invalidate queries to refetch user data when user signs in
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         // Redirect to app if user just authenticated

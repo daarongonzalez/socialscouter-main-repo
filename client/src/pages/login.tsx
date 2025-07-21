@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import iconNameSmall from "@assets/icon-name-small.png";
 import { PricingTable } from "@/components/pricing-table";
+import { SubscriptionCheckout } from "@/components/subscription-checkout";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 
@@ -21,6 +22,12 @@ export default function LoginPage() {
   const [selectedPlan, setSelectedPlan] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    planName: string;
+    isYearly: boolean;
+    clientSecret: string;
+  } | null>(null);
 
   // Note: Redirect logic moved to useAuth hook to handle all authentication flows
 
@@ -122,13 +129,18 @@ export default function LoginPage() {
     }
   };
 
-  const handlePlanSelect = (plan: string, isYearly: boolean) => {
-    setSelectedPlan(`${plan}-${isYearly ? 'yearly' : 'monthly'}`);
-    handleGoogleAuth();
+  const handlePlanSelect = (planName: string, isYearly: boolean, clientSecret: string) => {
+    setCheckoutData({ planName, isYearly, clientSecret });
+    setShowCheckout(true);
   };
 
   const handleBackToSignup = () => {
     setShowPricing(false);
+  };
+
+  const handleBackFromCheckout = () => {
+    setShowCheckout(false);
+    setCheckoutData(null);
   };
 
   return (
@@ -156,12 +168,22 @@ export default function LoginPage() {
       </header>
       
       {/* Main Content */}
-      <div className="flex flex-col items-center justify-center px-4 py-16 relative">
-        <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
-          {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
-        </h1>
+      {showCheckout && checkoutData ? (
+        <div className="px-4 py-16">
+          <SubscriptionCheckout 
+            planName={checkoutData.planName}
+            isYearly={checkoutData.isYearly}
+            clientSecret={checkoutData.clientSecret}
+            onBack={handleBackFromCheckout}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center px-4 py-16 relative">
+          <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
+            {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
+          </h1>
 
-        {showPricing ? (
+          {showPricing ? (
           <div className="w-full max-w-6xl">
             <div className="text-center mb-8">
               <Button 
@@ -301,8 +323,9 @@ export default function LoginPage() {
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

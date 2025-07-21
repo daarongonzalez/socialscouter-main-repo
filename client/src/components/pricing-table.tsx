@@ -1,16 +1,58 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import users1Icon from '@assets/Users-1.png';
 import users2Icon from '@assets/Users-2.png';
 import users3Icon from '@assets/Users-3.png';
 
 interface PricingTableProps {
-  onPlanSelect: (plan: string, isYearly: boolean) => void;
+  onPlanSelect: (plan: string, isYearly: boolean, clientSecret: string) => void;
 }
 
 export function PricingTable({ onPlanSelect }: PricingTableProps) {
   const [isYearly, setIsYearly] = useState(false);
+  const [isLoading, setIsLoading] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+
+  const handlePlanSelection = async (planName: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to select a subscription plan.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(planName);
+    try {
+      const response = await apiRequest("POST", "/api/create-subscription", { 
+        plan: planName.toLowerCase(), 
+        isYearly 
+      });
+      
+      const data = await response.json();
+      
+      if (data.clientSecret) {
+        onPlanSelect(planName.toLowerCase(), isYearly, data.clientSecret);
+      } else {
+        throw new Error('No client secret received');
+      }
+    } catch (error) {
+      console.error("Error creating subscription:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start subscription process. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(null);
+    }
+  };
 
   const plans = {
     monthly: [
@@ -21,8 +63,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: users1Icon,
-        paymentUrl: 'https://buy.stripe.com/cNi9AM5vE4NN1JBfog0Ny00'
+        icon: users1Icon
       },
       {
         name: 'Business',
@@ -31,8 +72,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: users2Icon,
-        paymentUrl: 'https://buy.stripe.com/00w7sE3nwdkjgEvcc40Ny01'
+        icon: users2Icon
       },
       {
         name: 'Enterprise',
@@ -41,8 +81,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: users3Icon,
-        paymentUrl: 'https://buy.stripe.com/3cIcMY8HQ4NNcof0tm0Ny02'
+        icon: users3Icon
       }
     ],
     yearly: [
@@ -53,8 +92,7 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 5 videos at a time',
           'Analyze 20 videos a month'
         ],
-        icon: users1Icon,
-        paymentUrl: 'https://buy.stripe.com/fZu5kwcY67ZZfArcc40Ny03'
+        icon: users1Icon
       },
       {
         name: 'Business',
@@ -63,18 +101,16 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
           'Batch analysis for 10 videos at a time',
           'Analyze 50 videos a month'
         ],
-        icon: users2Icon,
-        paymentUrl: 'https://buy.stripe.com/7sY14ge2a943gEva3W0Ny04'
+        icon: users2Icon
       },
       {
         name: 'Enterprise',
-        price: '$1,238/mo.',
+        price: '$1,238/year',
         features: [
           'Batch analysis for 20 videos at a time',
           'Analyze 100 videos a month'
         ],
-        icon: users3Icon,
-        paymentUrl: 'https://buy.stripe.com/cNi9AM0bk1BB3RJgsk0Ny05'
+        icon: users3Icon
       }
     ]
   };
@@ -176,9 +212,17 @@ export function PricingTable({ onPlanSelect }: PricingTableProps) {
               {/* Sign Up Button */}
               <Button
                 className="w-full bg-blue-ribbon hover:opacity-90 text-white"
-                onClick={() => window.open(plan.paymentUrl, '_blank')}
+                onClick={() => handlePlanSelection(plan.name)}
+                disabled={isLoading === plan.name}
               >
-                Sign Up
+                {isLoading === plan.name ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 mr-2 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
+                    Creating...
+                  </div>
+                ) : (
+                  `Select ${plan.name}`
+                )}
               </Button>
             </CardContent>
           </Card>
