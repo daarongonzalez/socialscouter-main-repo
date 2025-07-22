@@ -24,7 +24,7 @@ export function PricingTable({ onPlanSelect, isSignUpFlow = false }: PricingTabl
     
     try {
       if (!isAuthenticated) {
-        // For unauthenticated users, pass plan selection to parent 
+        // For unauthenticated users in signup flow, always pass plan selection to parent
         // Parent will handle authentication first, then create subscription
         onPlanSelect(planName.toLowerCase(), isYearly, '');
         return;
