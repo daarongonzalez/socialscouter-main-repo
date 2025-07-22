@@ -29,6 +29,23 @@ export default function LoginPage() {
     clientSecret: string;
   } | null>(null);
 
+  // Handle post-redirect checkout flow
+  useEffect(() => {
+    if (isAuthenticated) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const checkoutPlan = urlParams.get('checkout');
+      const isYearly = urlParams.get('yearly') === 'true';
+      
+      if (checkoutPlan) {
+        // Clear URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Trigger subscription creation
+        handlePostAuthSubscription(checkoutPlan, isYearly);
+      }
+    }
+  }, [isAuthenticated]);
+
   // Redirect authenticated users to app (unless they're in checkout flow)
   if (isAuthenticated && !showCheckout && !showPricing) {
     navigate("/app");
@@ -104,22 +121,19 @@ export default function LoginPage() {
       setAuthError(null);
 
       const { signInWithGoogle } = await import("@/lib/firebase");
-      const result = await signInWithGoogle();
-
-      if (result?.user) {
-        console.log("Google authentication successful");
-        // Check if user had a plan selected before auth
-        if (selectedPlan) {
-          const [planName, billing] = selectedPlan.split('-');
-          const isYearly = billing === 'yearly';
-          // Process the subscription after successful authentication
-          await handlePostAuthSubscription(planName, isYearly);
-        }
+      
+      // Store selected plan before redirect (if any)
+      if (selectedPlan) {
+        localStorage.setItem('selectedPlan', selectedPlan);
       }
+      
+      // signInWithGoogle uses redirect, so this will redirect the page
+      await signInWithGoogle();
+      
+      // Code after this won't execute due to redirect
     } catch (error) {
       console.error("Authentication error:", error);
       setAuthError("Authentication failed. Please try again.");
-    } finally {
       setIsAuthenticating(false);
     }
   };
