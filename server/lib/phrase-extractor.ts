@@ -39,95 +39,93 @@ const NEGATIVE_INDICATORS = [
 export function extractPhrases(transcript: string): ExtractedPhrases {
   const text = transcript.toLowerCase();
   
-  // Split by multiple delimiters including periods, exclamation, question marks, and natural pauses
-  const sentences = text.split(/[.!?\n]+|(?:\s{2,})|(?:,\s+(?:and|but|so|then|now|well|okay|alright)\s+)/)
+  // Use simpler sentence splitting to ensure we get meaningful segments
+  const sentences = text.split(/[.!?]+/)
     .map(s => s.trim())
-    .filter(s => s.length > 0);
+    .filter(s => s.length > 5);
   
   const positivePhrases: string[] = [];
   const negativePhrases: string[] = [];
   
+  console.log(`Processing transcript with ${sentences.length} sentences`);
+  
   for (const sentence of sentences) {
     const trimmedSentence = sentence.trim();
     
-    // Skip very short sentences or very long ones (likely full paragraphs)
-    if (trimmedSentence.length < 8 || trimmedSentence.length > 120) continue;
+    // Skip very short sentences but allow longer ones (we'll truncate them later)
+    if (trimmedSentence.length < 5) continue;
     
     // Check for positive indicators
-    const hasPositive = POSITIVE_INDICATORS.some(indicator => 
+    const positiveIndicator = POSITIVE_INDICATORS.find(indicator => 
       trimmedSentence.includes(indicator)
     );
     
     // Check for negative indicators  
-    const hasNegative = NEGATIVE_INDICATORS.some(indicator => 
+    const negativeIndicator = NEGATIVE_INDICATORS.find(indicator => 
       trimmedSentence.includes(indicator)
     );
     
     // Process positive phrases
-    if (hasPositive && positivePhrases.length < 3) {
-      const processedPhrase = extractMeaningfulPhrase(trimmedSentence, POSITIVE_INDICATORS);
+    if (positiveIndicator && positivePhrases.length < 2) {
+      const processedPhrase = extractSentencePortion(trimmedSentence, positiveIndicator);
       if (processedPhrase) {
         positivePhrases.push(capitalizeFirstLetter(processedPhrase));
+        console.log(`Added positive phrase: "${processedPhrase}"`);
       }
     }
     
-    // Process negative phrases 
-    if (hasNegative && negativePhrases.length < 3) {
-      const processedPhrase = extractMeaningfulPhrase(trimmedSentence, NEGATIVE_INDICATORS);
+    // Process negative phrases (prioritize over positive if both exist)
+    else if (negativeIndicator && negativePhrases.length < 2) {
+      const processedPhrase = extractSentencePortion(trimmedSentence, negativeIndicator);
       if (processedPhrase) {
         negativePhrases.push(capitalizeFirstLetter(processedPhrase));
+        console.log(`Added negative phrase: "${processedPhrase}"`);
       }
     }
   }
   
+  console.log(`Final extraction - Positive: ${positivePhrases.length}, Negative: ${negativePhrases.length}`);
+  console.log(`Positive phrases:`, positivePhrases);
+  console.log(`Negative phrases:`, negativePhrases);
+  
   return {
-    positivePhrases: positivePhrases.slice(0, 2), // Limit to 2 phrases
-    negativePhrases: negativePhrases.slice(0, 2)  // Limit to 2 phrases
+    positivePhrases,
+    negativePhrases
   };
 }
 
 /**
- * Extracts a meaningful phrase around sentiment indicators
+ * Extracts a meaningful portion of a sentence around a sentiment indicator
  */
-function extractMeaningfulPhrase(sentence: string, indicators: string[]): string | null {
-  // If sentence is already short enough, return it as-is
-  if (sentence.length <= 60) {
+function extractSentencePortion(sentence: string, indicator: string): string | null {
+  // If sentence is short enough, return as-is
+  if (sentence.length <= 80) {
     return sentence;
   }
   
-  // Find the first sentiment indicator in the sentence
-  const foundIndicator = indicators.find(indicator => sentence.includes(indicator));
-  if (!foundIndicator) return sentence.substring(0, 60);
+  // Find where the indicator appears
+  const indicatorIndex = sentence.indexOf(indicator);
+  if (indicatorIndex === -1) return sentence.substring(0, 80);
   
-  const indicatorIndex = sentence.indexOf(foundIndicator);
+  // Extract a window around the indicator (about 40 chars each side)
+  const windowSize = 40;
+  const start = Math.max(0, indicatorIndex - windowSize);
+  const end = Math.min(sentence.length, indicatorIndex + indicator.length + windowSize);
   
-  // Extract context around the indicator (roughly 30 characters before and after)
-  const start = Math.max(0, indicatorIndex - 30);
-  const end = Math.min(sentence.length, indicatorIndex + foundIndicator.length + 30);
+  let portion = sentence.substring(start, end).trim();
   
-  let extractedPhrase = sentence.substring(start, end).trim();
-  
-  // Clean up the edges - try to end at word boundaries
-  const words = extractedPhrase.split(' ');
-  if (words.length > 8) {
-    // Take middle portion if too many words
-    const midStart = Math.max(0, Math.floor(words.length / 4));
-    const midEnd = Math.min(words.length, Math.floor(words.length * 3 / 4));
-    extractedPhrase = words.slice(midStart, midEnd).join(' ');
+  // Clean up word boundaries
+  if (start > 0) {
+    const firstSpace = portion.indexOf(' ');
+    if (firstSpace > 0) portion = portion.substring(firstSpace + 1);
   }
   
-  // Ensure it doesn't start or end with partial words (unless it's the full sentence)
-  if (start > 0 && !extractedPhrase.startsWith(' ')) {
-    const firstSpace = extractedPhrase.indexOf(' ');
-    if (firstSpace > 0) extractedPhrase = extractedPhrase.substring(firstSpace + 1);
+  if (end < sentence.length) {
+    const lastSpace = portion.lastIndexOf(' ');
+    if (lastSpace > 0) portion = portion.substring(0, lastSpace);
   }
   
-  if (end < sentence.length && !extractedPhrase.endsWith(' ')) {
-    const lastSpace = extractedPhrase.lastIndexOf(' ');
-    if (lastSpace > 0) extractedPhrase = extractedPhrase.substring(0, lastSpace);
-  }
-  
-  return extractedPhrase.trim() || sentence.substring(0, 60);
+  return portion.trim() || sentence.substring(0, 80);
 }
 
 /**
