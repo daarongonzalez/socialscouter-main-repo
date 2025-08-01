@@ -30,10 +30,14 @@ export interface IStorage {
   // Migration helper
   migrateUserToFirebase(firebaseUid: string, email: string): Promise<User>;
   
+  // Fix existing incomplete batch data
+  fixIncompleteBatchData(): Promise<void>;
+  
   createAnalysisResult(result: InsertAnalysisResult): Promise<AnalysisResult>;
   getAnalysisResultsByBatchId(batchId: number): Promise<AnalysisResult[]>;
   
   createBatchAnalysis(batch: InsertBatchAnalysis): Promise<BatchAnalysis>;
+  updateBatchAnalysis(id: number, updates: Partial<InsertBatchAnalysis>): Promise<BatchAnalysis>;
   getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined>;
   getAllBatchAnalyses(): Promise<BatchAnalysis[]>;
   getUserBatchAnalyses(userId: string): Promise<BatchAnalysis[]>;
@@ -185,6 +189,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async updateBatchAnalysis(id: number, updates: Partial<InsertBatchAnalysis>): Promise<BatchAnalysis> {
+    const [result] = await db
+      .update(batchAnalysis)
+      .set(updates)
+      .where(eq(batchAnalysis.id, id))
+      .returning();
+    return result;
+  }
+
   async getBatchAnalysis(id: number): Promise<BatchAnalysis | undefined> {
     const [batch] = await db
       .select()
@@ -255,6 +268,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, existingUser.id));
 
     return user;
+  }
+
+  async fixIncompleteBatchData(): Promise<void> {
+    // Get all batches with incomplete data (avgConfidence = 0)
+    const incompleteBatches = await db
+      .select()
+      .from(batchAnalysis)
+      .where(eq(batchAnalysis.avgConfidence, 0));
+
+    console.log(`Found ${incompleteBatches.length} incomplete batches to fix`);
+
+    for (const batch of incompleteBatches) {
+      const results = await this.getAnalysisResultsByBatchId(batch.id);
+      
+      if (results.length === 0) {
+        console.log(`Batch ${batch.id} has no results, skipping`);
+        continue;
+      }
+
+      // Recalculate the summary data
+      const totalWords = results.reduce((sum, result) => sum + (result.wordCount || 0), 0);
+      const totalConfidence = results.reduce((sum, result) => sum + (result.confidence || 0), 0);
+      const avgConfidence = totalConfidence / results.length;
+
+      // Count sentiments
+      const sentimentCounts = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 };
+      results.forEach(result => {
+        if (result.sentiment && sentimentCounts.hasOwnProperty(result.sentiment)) {
+          sentimentCounts[result.sentiment as keyof typeof sentimentCounts]++;
+        }
+      });
+
+      // Update the batch
+      await this.updateBatchAnalysis(batch.id, {
+        totalWords,
+        avgConfidence,
+        sentimentCounts: JSON.stringify(sentimentCounts)
+      });
+
+      console.log(`Fixed batch ${batch.id}: ${results.length} results, avg confidence: ${avgConfidence.toFixed(2)}`);
+    }
   }
 }
 

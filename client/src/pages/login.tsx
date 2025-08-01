@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import iconNameSmall from "@assets/icon-name-small.png";
 import { PricingTable } from "@/components/pricing-table";
+import { SubscriptionCheckout } from "@/components/subscription-checkout";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 
@@ -21,8 +22,35 @@ export default function LoginPage() {
   const [selectedPlan, setSelectedPlan] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    planName: string;
+    isYearly: boolean;
+    clientSecret: string;
+  } | null>(null);
 
-  // Note: Redirect logic moved to useAuth hook to handle all authentication flows
+  // Handle post-redirect checkout flow
+  useEffect(() => {
+    if (isAuthenticated) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const checkoutPlan = urlParams.get('checkout');
+      const isYearly = urlParams.get('yearly') === 'true';
+      
+      if (checkoutPlan) {
+        // Clear URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Trigger subscription creation
+        handlePostAuthSubscription(checkoutPlan, isYearly);
+      }
+    }
+  }, [isAuthenticated]);
+
+  // Redirect authenticated users to app (unless they're in checkout flow)
+  if (isAuthenticated && !showCheckout && !showPricing) {
+    navigate("/app");
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -46,7 +74,7 @@ export default function LoginPage() {
     try {
       setAuthError(null);
       setIsAuthenticating(true);
-      
+
       if (isSignUp) {
         const { signUpWithEmail } = await import("@/lib/firebase");
         await signUpWithEmail(email, password);
@@ -56,13 +84,19 @@ export default function LoginPage() {
         await signInWithEmail(email, password);
         console.log("User signed in successfully");
       }
+
+      // If there's a selected plan, create subscription after authentication
+      if (selectedPlan) {
+        await handlePostAuthSubscription(selectedPlan, false);
+      }
+
       // Navigation will be handled by useAuth hook
     } catch (error: any) {
       setIsAuthenticating(false);
       console.error("Authentication error:", error);
-      
+
       let errorMessage = "Authentication failed. Please try again.";
-      
+
       if (error?.code === "auth/user-not-found") {
         errorMessage = "No account found with this email address.";
       } else if (error?.code === "auth/wrong-password") {
@@ -76,39 +110,59 @@ export default function LoginPage() {
       } else if (error?.message) {
         errorMessage = `Authentication failed: ${error.message}`;
       }
-      
+
       setAuthError(errorMessage);
     }
   };
 
   const handleGoogleAuth = async () => {
     try {
-      setAuthError(null);
       setIsAuthenticating(true);
-      console.log("Starting Google authentication...");
+      setAuthError(null);
+
       const { signInWithGoogle } = await import("@/lib/firebase");
-      await signInWithGoogle();
-      // User will be redirected to Google and back
-      console.log("Redirecting to Google for authentication...");
-    } catch (error: any) {
-      setIsAuthenticating(false);
-      console.error("Authentication error:", error);
       
-      let errorMessage = "Authentication failed. Please try again.";
-      
-      if (error?.code === "auth/unauthorized-domain") {
-        errorMessage = "Firebase authentication is not configured for this domain. Please contact support or try again later.";
-      } else if (error?.code === "auth/popup-blocked") {
-        errorMessage = "Authentication redirecting... If this doesn't work, please allow popups for this site.";
-      } else if (error?.code === "auth/popup-closed-by-user") {
-        errorMessage = "Authentication redirecting... Please wait to be redirected to Google sign-in.";
-      } else if (error?.code === "auth/redirect-cancelled-by-user") {
-        errorMessage = "Authentication was cancelled. Please try again.";
-      } else if (error?.message) {
-        errorMessage = `Authentication failed: ${error.message}`;
+      // Store selected plan before redirect (if any)
+      if (selectedPlan) {
+        localStorage.setItem('selectedPlan', selectedPlan);
       }
       
-      setAuthError(errorMessage);
+      // signInWithGoogle uses redirect, so this will redirect the page
+      await signInWithGoogle();
+      
+      // Code after this won't execute due to redirect
+    } catch (error) {
+      console.error("Authentication error:", error);
+      setAuthError("Authentication failed. Please try again.");
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handlePostAuthSubscription = async (planName: string, isYearly: boolean = false) => {
+    try {
+      console.log(`Creating subscription for plan: ${planName}`);
+      const { apiRequest } = await import("@/lib/queryClient");
+
+      const response = await apiRequest("POST", "/api/create-subscription", { 
+        plan: planName.toLowerCase(), 
+        isYearly
+      });
+
+      const data = await response.json();
+
+      if (data.clientSecret) {
+        setCheckoutData({ 
+          planName: planName.toLowerCase(), 
+          isYearly, 
+          clientSecret: data.clientSecret 
+        });
+        setShowCheckout(true);
+        setSelectedPlan(""); // Clear selected plan
+        setShowPricing(false); // Hide pricing table
+      }
+    } catch (error) {
+      console.error("Error creating post-auth subscription:", error);
+      setAuthError("Failed to process subscription. Please try again.");
     }
   };
 
@@ -122,13 +176,33 @@ export default function LoginPage() {
     }
   };
 
-  const handlePlanSelect = (plan: string, isYearly: boolean) => {
-    setSelectedPlan(`${plan}-${isYearly ? 'yearly' : 'monthly'}`);
-    handleGoogleAuth();
+  const handlePlanSelect = async (planName: string, isYearly: boolean, clientSecret: string) => {
+    if (clientSecret) {
+      // This is authenticated flow with subscription created - proceed to checkout
+      setCheckoutData({ planName, isYearly, clientSecret });
+      setShowCheckout(true);
+      return;
+    }
+
+    // For authenticated users, create subscription directly without going back to auth form
+    if (isAuthenticated) {
+      await handlePostAuthSubscription(planName, isYearly);
+      return;
+    }
+
+    // For unauthenticated users in sign-up flow - store plan and show auth form
+    setSelectedPlan(planName);
+    setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
+    setShowPricing(false);
   };
 
   const handleBackToSignup = () => {
     setShowPricing(false);
+  };
+
+  const handleBackFromCheckout = () => {
+    setShowCheckout(false);
+    setCheckoutData(null);
   };
 
   return (
@@ -140,13 +214,13 @@ export default function LoginPage() {
             <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Blog</span>
             <span className="text-sm" style={{ color: 'hsl(var(--neutral-500))' }}>Products</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <a href="https://socialscouter.ai/" className="hover:opacity-80 transition-opacity">
               <img src={iconNameSmall} alt="SocialScouter" className="h-8 object-contain" />
             </a>
           </div>
-          
+
           <Button 
             variant="default" 
             className="bg-blue-ribbon hover:opacity-90 text-white px-6"
@@ -154,14 +228,24 @@ export default function LoginPage() {
           >Login</Button>
         </div>
       </header>
-      
-      {/* Main Content */}
-      <div className="flex flex-col items-center justify-center px-4 py-16 relative">
-        <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
-          {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
-        </h1>
 
-        {showPricing ? (
+      {/* Main Content */}
+      {showCheckout && checkoutData ? (
+        <div className="px-4 py-16">
+          <SubscriptionCheckout 
+            planName={checkoutData.planName}
+            isYearly={checkoutData.isYearly}
+            clientSecret={checkoutData.clientSecret}
+            onBack={handleBackFromCheckout}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center px-4 py-16 relative">
+          <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
+            {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
+          </h1>
+
+          {showPricing ? (
           <div className="w-full max-w-6xl">
             <div className="text-center mb-8">
               <Button 
@@ -178,7 +262,7 @@ export default function LoginPage() {
                 Select a plan that works for your needs
               </p>
             </div>
-            <PricingTable onPlanSelect={handlePlanSelect} />
+            <PricingTable onPlanSelect={handlePlanSelect} isSignUpFlow={true} />
           </div>
         ) : (
           <Card className="w-full max-w-md mx-auto bg-white border-0 shadow-lg">
@@ -301,8 +385,9 @@ export default function LoginPage() {
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

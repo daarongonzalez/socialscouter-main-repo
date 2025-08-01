@@ -9,8 +9,10 @@ import { planLimitsService } from "./lib/plan-limits-service";
 import { getSession } from "./session";
 import { body, validationResult } from "express-validator";
 import { InputSanitizer } from "./lib/input-sanitizer";
+import { extractPhrases } from "./lib/phrase-extractor";
 import { getCsrfToken } from "./lib/csrf-middleware";
 import { authenticateFirebaseToken, type AuthenticatedRequest } from "./lib/auth-middleware";
+import { authSyncService } from "./lib/auth-sync-service";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -88,6 +90,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Post-authentication sync endpoint (requires authentication)
+  app.post('/api/auth/sync', authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { displayName } = req.body;
+      
+      const syncResult = await authSyncService.handlePostSignup(
+        req.user.id, 
+        req.user.email,
+        displayName || `${req.user.firstName} ${req.user.lastName}`.trim()
+      );
+      
+      if (syncResult.success) {
+        res.json({
+          success: true,
+          message: syncResult.message,
+          stripeCustomerId: syncResult.stripeCustomerId
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: syncResult.message
+        });
+      }
+    } catch (error) {
+      console.error("Auth sync error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Authentication sync failed" 
+      });
+    }
+  });
+
   // CSRF token endpoint
   app.get("/api/csrf-token", (req: any, res) => {
     const token = req.csrfToken ? req.csrfToken() : getCsrfToken();
@@ -153,13 +187,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               confidence: 0.5,
               transcript: "No transcript available",
               wordCount: 0,
-              sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
+              sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 }),
+              commonPositivePhrases: JSON.stringify([]),
+              commonNegativePhrases: JSON.stringify([])
             });
             continue;
           }
 
           // Analyze sentiment
           const sentimentResult = await sentimentService.analyzeSentiment(transcript);
+          
+          // Extract positive and negative phrases
+          const extractedPhrases = extractPhrases(transcript);
           
           // Create analysis result
           const analysisResult = await storage.createAnalysisResult({
@@ -170,7 +209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sentiment: sentimentResult.sentiment,
             confidence: sentimentResult.confidence,
             wordCount: transcript.split(' ').length,
-            sentimentScores: JSON.stringify(sentimentResult.scores || {})
+            sentimentScores: JSON.stringify(sentimentResult.scores || {}),
+            commonPositivePhrases: JSON.stringify(extractedPhrases.positivePhrases),
+            commonNegativePhrases: JSON.stringify(extractedPhrases.negativePhrases)
           });
 
           results.push(analysisResult);
@@ -195,7 +236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             confidence: 0.5,
             transcript: "Error processing video",
             wordCount: 0,
-            sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 })
+            sentimentScores: JSON.stringify({ positive: 0, neutral: 1, negative: 0 }),
+            commonPositivePhrases: JSON.stringify([]),
+            commonNegativePhrases: JSON.stringify([])
           });
         }
       }
@@ -211,6 +254,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentimentScores.neutral = sentimentScores.neutral / totalVideos;
         sentimentScores.negative = sentimentScores.negative / totalVideos;
       }
+
+      // Update the batch with calculated results
+      await storage.updateBatchAnalysis(batch.id, {
+        totalWords,
+        avgConfidence,
+        processingTime,
+        sentimentCounts: JSON.stringify(sentimentCounts)
+      });
 
       // Record video usage for the user
       await planLimitsService.recordVideoUsage(userId, totalVideos);
@@ -278,6 +329,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fix incomplete batch data (admin route)
+  app.post("/api/admin/fix-batch-data", async (req, res) => {
+    try {
+      await storage.fixIncompleteBatchData();
+      res.json({ message: "Batch data fixed successfully" });
+    } catch (error) {
+      console.error("Error fixing batch data:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Get user plan information (requires authentication)
   app.get("/api/user/plan", authenticateFirebaseToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -326,12 +388,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: [{ price: priceId }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent']
+        expand: ['latest_invoice.payment_intent'],
+        metadata: {
+          userId: req.user.id,
+          plan: plan,
+          isYearly: isYearly.toString()
+        }
       });
       
+      // Update user with subscription ID
+      await storage.updateUserStripeInfo(req.user.id, stripeCustomerId, subscription.id);
+      
+      const invoice = subscription.latest_invoice as any;
+      const clientSecret = invoice?.payment_intent?.client_secret;
+      if (!clientSecret) {
+        return res.status(400).json({ error: "Failed to create payment intent" });
+      }
+      
       res.json({
-        subscriptionId: subscription.id,
-        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret
+        clientSecret,
+        subscriptionId: subscription.id
       });
     } catch (error) {
       console.error("Subscription creation error:", error);
@@ -357,7 +433,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       switch (event.type) {
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
-        case 'customer.subscription.deleted':
           const subscription = event.data.object;
           const plan = getPlanFromPriceId(subscription.items.data[0].price.id);
           
@@ -367,17 +442,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
               subscription.status,
               plan
             );
+            console.log(`Updated subscription for customer ${subscription.customer}: ${plan} - ${subscription.status}`);
           }
           break;
           
+        case 'customer.subscription.deleted':
+          const deletedSub = event.data.object;
+          await storage.updateUserSubscription(
+            deletedSub.customer as string,
+            'canceled',
+            undefined
+          );
+          console.log(`Canceled subscription for customer ${deletedSub.customer}`);
+          break;
+          
         case 'invoice.payment_succeeded':
-          const invoice = event.data.object;
-          // Handle successful payment
+          const invoice = event.data.object as any;
+          console.log(`Payment succeeded for customer ${invoice.customer}`);
+          
+          // Ensure subscription is active after successful payment
+          if (invoice.subscription) {
+            const subId = invoice.subscription as string;
+            try {
+              const subDetails = await stripe.subscriptions.retrieve(subId);
+              const plan = getPlanFromPriceId(subDetails.items.data[0].price.id);
+              if (plan) {
+                await storage.updateUserSubscription(
+                  subDetails.customer as string,
+                  'active',
+                  plan
+                );
+              }
+            } catch (error) {
+              console.error('Error processing successful payment:', error);
+            }
+          }
           break;
           
         case 'invoice.payment_failed':
-          const failedInvoice = event.data.object;
-          // Handle failed payment
+          const failedInvoice = event.data.object as any;
+          console.log(`Payment failed for customer ${failedInvoice.customer}`);
+          
+          // Mark subscription as past_due
+          if (failedInvoice.subscription) {
+            await storage.updateUserSubscription(
+              failedInvoice.customer as string,
+              'past_due',
+              undefined
+            );
+          }
           break;
       }
       

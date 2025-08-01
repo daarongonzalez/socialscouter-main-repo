@@ -25,7 +25,7 @@ export async function authenticateFirebaseToken(
     // Get Firebase user details
     const firebaseUser = await getFirebaseUser(decodedToken.uid);
     
-    // Get or create user in our database
+    // Get or create user in our database with automatic Stripe sync
     let user;
     try {
       user = await storage.upsertUser({
@@ -35,6 +35,19 @@ export async function authenticateFirebaseToken(
         lastName: decodedToken.name?.split(' ').slice(1).join(' ') || firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
         profileImageUrl: decodedToken.picture || firebaseUser.photoURL || null,
       });
+
+      // Automatically sync with Stripe if not already done
+      if (!user.stripeCustomerId) {
+        const { authSyncService } = await import('./auth-sync-service');
+        const displayName = decodedToken.name || firebaseUser.displayName;
+        await authSyncService.syncFirebaseUserWithStripe(
+          decodedToken.uid,
+          decodedToken.email || firebaseUser.email || '',
+          displayName || undefined
+        );
+        // Refresh user data after sync
+        user = await storage.getUser(decodedToken.uid) || user;
+      }
     } catch (error: any) {
       // Handle unique constraint violation for email (legacy user migration)
       if (error.code === '23505' && error.constraint === 'users_email_unique') {
