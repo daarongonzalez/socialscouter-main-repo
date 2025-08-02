@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,12 +10,12 @@ import { PricingTable } from "@/components/pricing-table";
 import { SubscriptionCheckout } from "@/components/subscription-checkout";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -28,6 +29,7 @@ export default function LoginPage() {
     isYearly: boolean;
     clientSecret: string;
   } | null>(null);
+  const isMobile = useIsMobile();
 
   // Handle post-redirect checkout flow
   useEffect(() => {
@@ -46,8 +48,22 @@ export default function LoginPage() {
     }
   }, [isAuthenticated]);
 
+  // After successful authentication, check localStorage for stored plan and trigger checkout
+  useEffect(() => {
+    if (isAuthenticated) {
+      const storedPlan = localStorage.getItem('selectedPlan');
+      const storedIsYearly = localStorage.getItem('selectedIsYearly');
+      if (storedPlan) {
+        const isYearly = storedIsYearly ? JSON.parse(storedIsYearly) : false;
+        handlePostAuthSubscription(storedPlan, isYearly);
+        localStorage.removeItem('selectedPlan');
+        localStorage.removeItem('selectedIsYearly');
+      }
+    }
+  }, [isAuthenticated]);
+
   // Redirect authenticated users to app (unless they're in checkout flow)
-  if (isAuthenticated && !showCheckout && !showPricing) {
+  if (isAuthenticated && !showCheckout) {
     navigate("/app");
     return null;
   }
@@ -158,7 +174,6 @@ export default function LoginPage() {
         });
         setShowCheckout(true);
         setSelectedPlan(""); // Clear selected plan
-        setShowPricing(false); // Hide pricing table
       }
     } catch (error) {
       console.error("Error creating post-auth subscription:", error);
@@ -167,37 +182,37 @@ export default function LoginPage() {
   };
 
   const handleSignUpClick = () => {
-    if (isSignUp && !showPricing) {
-      // Show pricing table when signing up
-      setShowPricing(true);
-    } else {
+    if (isSignUp) {
       // Handle email/password login
       handleEmailPasswordAuth();
+    } else {
+      // Show pricing table when signing up
+      setShowCheckout(true); // This will trigger the checkout modal
     }
   };
 
   const handlePlanSelect = async (planName: string, isYearly: boolean, clientSecret: string) => {
     if (clientSecret) {
-      // This is authenticated flow with subscription created - proceed to checkout
       setCheckoutData({ planName, isYearly, clientSecret });
       setShowCheckout(true);
       return;
     }
 
-    // For authenticated users, create subscription directly without going back to auth form
     if (isAuthenticated) {
       await handlePostAuthSubscription(planName, isYearly);
       return;
     }
 
-    // For unauthenticated users in sign-up flow - store plan and show auth form
+    // For unauthenticated users: store plan and billing period in localStorage
     setSelectedPlan(planName);
-    setAuthError("Please complete authentication to proceed with your " + planName + " plan selection.");
-    setShowPricing(false);
+    localStorage.setItem('selectedPlan', planName);
+    localStorage.setItem('selectedIsYearly', JSON.stringify(isYearly));
+    setAuthError(`Please sign up or log in to continue with your ${planName} plan.`);
   };
 
   const handleBackToSignup = () => {
-    setShowPricing(false);
+    setShowCheckout(false);
+    setCheckoutData(null);
   };
 
   const handleBackFromCheckout = () => {
@@ -206,7 +221,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'hsl(var(--neutral-50))' }}>
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
       <header className="w-full py-4 px-6">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -230,41 +245,21 @@ export default function LoginPage() {
       </header>
 
       {/* Main Content */}
-      {showCheckout && checkoutData ? (
-        <div className="px-4 py-16">
-          <SubscriptionCheckout 
-            planName={checkoutData.planName}
-            isYearly={checkoutData.isYearly}
-            clientSecret={checkoutData.clientSecret}
-            onBack={handleBackFromCheckout}
-          />
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center px-4 py-16 relative">
-          <h1 className="text-4xl font-bold mb-16 text-center" style={{ color: 'hsl(var(--neutral-800))' }}>
-            {isSignUp ? "We're Stoked You're Here!" : "Welcome Back!"}
-          </h1>
-
-          {showPricing ? (
-          <div className="w-full max-w-6xl">
-            <div className="text-center mb-8">
-              <Button 
-                variant="outline" 
-                onClick={handleBackToSignup}
-                className="mb-4"
-              >
-                ← Back to Sign Up
-              </Button>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: 'hsl(var(--neutral-800))' }}>
-                Choose Your Plan
-              </h2>
-              <p className="text-neutral-600">
-                Select a plan that works for your needs
-              </p>
-            </div>
-            <PricingTable onPlanSelect={handlePlanSelect} isSignUpFlow={true} />
+      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} items-start justify-center w-full max-w-7xl mx-auto px-4 py-16 gap-8`}>
+        {/* Pricing Table Section */}
+        <div className={`${isMobile ? 'w-full mb-8' : 'w-1/2 pr-8'}`}> 
+          <div className="mb-4 text-center">
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'hsl(var(--neutral-800))' }}>
+              Choose Your Plan
+            </h2>
+            <p className="text-neutral-600 mb-2">
+              Select a plan, then sign up or log in to continue to checkout.
+            </p>
           </div>
-        ) : (
+          <PricingTable onPlanSelect={handlePlanSelect} isSignUpFlow={true} />
+        </div>
+        {/* Auth Form Section */}
+        <div className={`${isMobile ? 'w-full' : 'w-1/2'}`}> 
           <Card className="w-full max-w-md mx-auto bg-white border-0 shadow-lg">
             <CardContent className="p-8">
               {authError && (
@@ -374,7 +369,6 @@ export default function LoginPage() {
                   className="text-sm text-tree-poppy hover:opacity-80"
                   onClick={() => {
                     setIsSignUp(!isSignUp);
-                    setShowPricing(false);
                   }}
                 >
                   {isSignUp 
@@ -385,7 +379,19 @@ export default function LoginPage() {
               </div>
             </CardContent>
           </Card>
-          )}
+        </div>
+      </div>
+      {/* Checkout Modal */}
+      {showCheckout && checkoutData && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-lg w-full">
+            <SubscriptionCheckout 
+              planName={checkoutData.planName}
+              isYearly={checkoutData.isYearly}
+              clientSecret={checkoutData.clientSecret}
+              onBack={handleBackFromCheckout}
+            />
+          </div>
         </div>
       )}
     </div>
